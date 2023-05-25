@@ -29,13 +29,13 @@ contract ThrottledWallet is Owned {
 
     // Token that will be throttled, other tokens can be withdrawn freely by owner
     // If address(0) then ETH will be used
-    SolMateERC20 public immutable throttedToken;
+    SolMateERC20 public immutable throttledToken;
 
     // Timelock duration in seconds, 0 means no timelock
     uint256 public timelockDuration;
 
     uint256 public periodStart = 0;
-    uint256 public withdrawedAmount = 0;
+    uint256 public lastWithdrawalAmount = 0;
 
     // Nonce for timelocked withdrawals, incremented for each withdrawal
     // used as key in pendingWithdrawals
@@ -68,7 +68,8 @@ contract ThrottledWallet is Owned {
 
     function _withdraw(SolMateERC20 token, uint256 amount) internal {
         if (address(token) == address(0)) {
-            payable(owner).transfer(amount);
+            (bool success, ) = payable(owner).call{value: amount}("");
+            require(success, "transfer failed");
         } else {
             SafeTransferLib.safeTransfer(token, owner, amount);
         }
@@ -76,10 +77,10 @@ contract ThrottledWallet is Owned {
     }
 
     function _balance() internal view returns (uint256) {
-        if (address(throttedToken) == address(0)) {
+        if (address(throttledToken) == address(0)) {
             return address(this).balance;
         } else {
-            return throttedToken.balanceOf(address(this));
+            return throttledToken.balanceOf(address(this));
         }
     }
 
@@ -87,9 +88,9 @@ contract ThrottledWallet is Owned {
         uint256 _throttlePeriod,
         uint256 _withdrawAmountPrPeriod,
         uint256 _lockDuration,
-        SolMateERC20 _throttedToken
+        SolMateERC20 _throttledToken
     ) Owned(msg.sender) {
-        throttedToken = _throttedToken;
+        throttledToken = _throttledToken;
         _setConfig(_throttlePeriod, _withdrawAmountPrPeriod, _lockDuration);
     }
 
@@ -120,7 +121,7 @@ contract ThrottledWallet is Owned {
         );
         pendingWithdrawals[_nonce].amount = 0;
         totalPending -= timeLock.amount;
-        _withdraw(throttedToken, timeLock.amount);
+        _withdraw(throttledToken, timeLock.amount);
     }
 
     /**
@@ -137,7 +138,7 @@ contract ThrottledWallet is Owned {
         require(periodStart != block.timestamp, "reentrancy");
 
         // Allow rescuing tokens
-        if (token != throttedToken) {
+        if (token != throttledToken) {
             _withdraw(token, amount);
             return 0;
         }
@@ -149,21 +150,20 @@ contract ThrottledWallet is Owned {
         uint256 accumulatedWithdrawalAmount = (timeSincePeriodStart *
             withdrawAmountPrPeriod) / throttlePeriod;
 
-        uint256 currentAmount = withdrawedAmount;
-        if (accumulatedWithdrawalAmount > currentAmount) {
-            accumulatedWithdrawalAmount = currentAmount;
+        if (accumulatedWithdrawalAmount > lastWithdrawalAmount) {
+            accumulatedWithdrawalAmount = lastWithdrawalAmount;
         }
 
-        currentAmount = currentAmount - accumulatedWithdrawalAmount + amount;
+        uint256 currentWithdrawalAmount = lastWithdrawalAmount - accumulatedWithdrawalAmount + amount;
 
         // Check if withdraw amount is within limit
         require(
-            currentAmount <= withdrawAmountPrPeriod,
+            currentWithdrawalAmount <= withdrawAmountPrPeriod,
             "Withdraw amount exceeds period limit"
         );
 
         periodStart = block.timestamp;
-        withdrawedAmount = currentAmount;
+        lastWithdrawalAmount = currentWithdrawalAmount;
 
         // If timelock is enabled, start timelock and return nonce
         if (timelockDuration != 0) {

@@ -1,0 +1,7 @@
+{
+  "name": "throttle-wallet",
+  "packageManager": "yarn@3.5.0",
+  "dependencies": {
+    "prettier": "^2.8.8"
+  }
+}

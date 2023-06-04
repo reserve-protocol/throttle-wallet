@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
-import {Owned} from "solmate/auth/Owned.sol";
-import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
-import {ERC20 as SolMateERC20} from "solmate/tokens/ERC20.sol";
+pragma solidity ^0.8.19;
+
+import { Owned } from "solmate/auth/Owned.sol";
+import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
+import { ERC20 as SolMateERC20 } from "solmate/tokens/ERC20.sol";
 
 contract ThrottledWallet is Owned {
     struct TimeLock {
@@ -52,23 +53,16 @@ contract ThrottledWallet is Owned {
         uint256 _lockDuration
     ) internal {
         require(_throttlePeriod != 0, "throttlePeriod must be greater than 0");
-        require(
-            _withdrawAmountPrPeriod != 0,
-            "withdrawAmountPrPeriod must be greater than 0"
-        );
+        require(_withdrawAmountPrPeriod != 0, "withdrawAmountPrPeriod must be greater than 0");
         throttlePeriod = _throttlePeriod;
         withdrawAmountPrPeriod = _withdrawAmountPrPeriod;
         timelockDuration = _lockDuration;
-        emit ConfigurationUpdated(
-            _throttlePeriod,
-            _withdrawAmountPrPeriod,
-            _lockDuration
-        );
+        emit ConfigurationUpdated(_throttlePeriod, _withdrawAmountPrPeriod, _lockDuration);
     }
 
     function _withdraw(SolMateERC20 token, uint256 amount) internal {
         if (address(token) == address(0)) {
-            (bool success, ) = payable(owner).call{value: amount}("");
+            (bool success, ) = payable(owner).call{ value: amount }("");
             require(success, "transfer failed");
         } else {
             SafeTransferLib.safeTransfer(token, owner, amount);
@@ -115,10 +109,7 @@ contract ThrottledWallet is Owned {
     function completeWithdrawal(uint256 _nonce) external onlyOwner {
         TimeLock memory timeLock = pendingWithdrawals[_nonce];
         require(timeLock.amount != 0, "Nothing to withdraw");
-        require(
-            timeLock.unlockTime <= block.timestamp,
-            "Withdrawal is still timelocked"
-        );
+        require(timeLock.unlockTime <= block.timestamp, "Withdrawal is still timelocked");
         pendingWithdrawals[_nonce].amount = 0;
         totalPending -= timeLock.amount;
         _withdraw(throttledToken, timeLock.amount);
@@ -130,10 +121,7 @@ contract ThrottledWallet is Owned {
      * @param amount Amount to withdraw
      * @return nonce if withdrawal is timelocked, otherwise 0
      */
-    function withdraw(
-        SolMateERC20 token,
-        uint256 amount
-    ) external onlyOwner returns (uint256) {
+    function withdraw(SolMateERC20 token, uint256 amount) external onlyOwner returns (uint256) {
         require(amount != 0, "amount must be greater than 0");
         require(periodStart != block.timestamp, "reentrancy");
 
@@ -147,14 +135,16 @@ contract ThrottledWallet is Owned {
         require(_balance() >= totalPending + amount, "Not enough funds");
 
         uint256 timeSincePeriodStart = block.timestamp - periodStart;
-        uint256 accumulatedWithdrawalAmount = (timeSincePeriodStart *
-            withdrawAmountPrPeriod) / throttlePeriod;
+        uint256 accumulatedWithdrawalAmount = (timeSincePeriodStart * withdrawAmountPrPeriod) /
+            throttlePeriod;
 
         if (accumulatedWithdrawalAmount > lastWithdrawalAmount) {
             accumulatedWithdrawalAmount = lastWithdrawalAmount;
         }
 
-        uint256 currentWithdrawalAmount = lastWithdrawalAmount - accumulatedWithdrawalAmount + amount;
+        uint256 currentWithdrawalAmount = lastWithdrawalAmount -
+            accumulatedWithdrawalAmount +
+            amount;
 
         // Check if withdraw amount is within limit
         require(

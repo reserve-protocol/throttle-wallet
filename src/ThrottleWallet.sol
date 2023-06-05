@@ -92,13 +92,14 @@ contract ThrottleWallet is AccessControl {
         address target
     ) external onlyRole(USER_ROLE) returns (uint256) {
         require(amount != 0, "amount must be greater than 0");
-        require(amount <= amountPerPeriod, "amount must be less than max");
         require(
             throttledToken.balanceOf(address(this)) >= totalPending + amount,
             "insufficient funds"
         );
 
         uint256 accumulatedWithdrawalAmount = availableToWithdraw();
+
+        require(amount <= accumulatedWithdrawalAmount, "amount must be less than max");
 
         lastWithdrawalAt = block.timestamp;
         lastRemainingLimit = accumulatedWithdrawalAmount - amount;

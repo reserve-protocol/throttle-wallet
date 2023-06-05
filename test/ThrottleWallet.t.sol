@@ -38,10 +38,11 @@ contract ThrottleWalletTest is Test {
         throttleWallet = new ThrottleWallet(token, user_admin, user_user);
 
         token.mint(address(throttleWallet), 2_000_000_000 ether);
+
+        vm.warp(1686000000);
     }
 
     function test_Withdraw() public {
-        vm.warp(1686000000);
         vm.startPrank(user_user);
         vm.expectEmit();
 
@@ -54,7 +55,6 @@ contract ThrottleWalletTest is Test {
     }
 
     function test_WithdrawalTimelock() public {
-        vm.warp(1686000000);
         vm.startPrank(user_user);
         vm.expectEmit();
 
@@ -76,7 +76,6 @@ contract ThrottleWalletTest is Test {
     }
 
     function test_WithdrawalCancellation() public {
-        vm.warp(1686000000);
         vm.startPrank(user_user);
         vm.expectEmit();
 
@@ -104,8 +103,6 @@ contract ThrottleWalletTest is Test {
     }
 
     function test_AccessControl() public {
-        vm.warp(1686000000);
-
         vm.startPrank(address(4));
         vm.expectRevert();
 
@@ -130,7 +127,6 @@ contract ThrottleWalletTest is Test {
     }
 
     function test_LinearAccumulator() public {
-        vm.warp(1686000000);
         vm.startPrank(user_user);
 
         console2.log(throttleWallet.availableToWithdraw());
@@ -174,7 +170,6 @@ contract ThrottleWalletTest is Test {
     }
 
     function test_AccessControl_AdminLimits() public {
-        vm.warp(1686000000);
         vm.startPrank(user_admin);
 
         bytes32 DEFAULT_ADMIN_ROLE = 0x00;
@@ -201,5 +196,16 @@ contract ThrottleWalletTest is Test {
         throttleWallet.revokeRole(USER_ROLE, address(4));
         vm.expectRevert();
         throttleWallet.renounceRole(USER_ROLE, address(4));
+
+        // User can't do anything to the admin either.
+        vm.startPrank(user_user);
+        vm.expectRevert();
+        throttleWallet.grantRole(DEFAULT_ADMIN_ROLE, address(4));
+        vm.expectRevert();
+        throttleWallet.revokeRole(DEFAULT_ADMIN_ROLE, address(4));
+        vm.expectRevert();
+        throttleWallet.revokeRole(DEFAULT_ADMIN_ROLE, user_admin);
+        vm.expectRevert();
+        throttleWallet.renounceRole(DEFAULT_ADMIN_ROLE, address(4));
     }
 }

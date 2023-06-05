@@ -2,8 +2,8 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
-import {ThrottledWallet} from "../src/ThrottledWallet.sol";
-import {ERC20 as SolMateERC20} from "solmate/tokens/ERC20.sol";
+import { ThrottledWallet } from "../src/ThrottledWallet_old.sol";
+import { ERC20 as SolMateERC20 } from "solmate/tokens/ERC20.sol";
 
 contract ERC20 is SolMateERC20 {
     constructor(
@@ -105,7 +105,7 @@ contract SlowWalletTest is Test {
         uint256 nonce = slowWallet.withdraw(token, 1000 ether);
         assertEq(nonce, 1);
         vm.warp(block.timestamp + 1 days);
-        
+
         // pendingWithdrawals + balance < amount to withdraw
         vm.expectRevert();
         slowWallet.withdraw(token, 1000 ether);

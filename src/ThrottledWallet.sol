@@ -1,182 +1,146 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.19;
 
-import { Owned } from "solmate/auth/Owned.sol";
-import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
-import { ERC20 as SolMateERC20 } from "solmate/tokens/ERC20.sol";
+import { IERC20 } from "@openzeppelin/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import { AccessControl } from "@openzeppelin/access/AccessControl.sol";
 
-contract ThrottledWallet is Owned {
-    struct TimeLock {
-        uint256 amount;
-        uint256 unlockTime;
+contract ThrottledWallet2 is AccessControl {
+    using SafeERC20 for IERC20;
+
+    bytes32 public constant USER_ROLE = keccak256("USER_ROLE");
+
+    /**
+     * @notice Structs
+     */
+    enum WithdrawalStatus {
+        Pending,
+        Completed,
+        Cancelled
     }
 
-    event Withdrawal(address indexed token, address indexed to, uint256 amount);
-    event ConfigurationUpdated(
-        uint256 throttlePeriod,
-        uint256 withdrawAmountPrPeriod,
-        uint256 newTimelockDuration
-    );
-    event WithdrawalStarted(
-        address indexed token,
+    struct WithdrawalRequest {
+        uint256 amount;
+        address target;
+        uint256 unlockTime;
+        WithdrawalStatus status;
+    }
+
+    /**
+     * @notice Events
+     */
+    event WithdrawalInitiated(
+        uint256 indexed nonce,
         address indexed to,
         uint256 amount,
-        uint256 unlockTime,
-        uint256 nonce
+        uint256 unlockTime
     );
+    event WithdrawalCompleted(uint256 indexed nonce);
+    event WithdrawalCancelled(uint256 indexed nonce);
 
-    uint256 public throttlePeriod;
-    uint256 public withdrawAmountPrPeriod;
+    /**
+     * @notice Parameters
+     * @dev Intentionally hardcoded
+     */
+    IERC20 public constant throttledToken = IERC20(0x320623b8E4fF03373931769A31Fc52A4E78B5d70); // RSR
+    uint256 public constant throttlePeriod = 30 days;
+    uint256 public constant amountPerPeriod = 1_000_000_000 * 10 ** 18; // (at most) 1B every 30 days, throttled
+    uint256 public constant timelockDuration = 4 weeks;
 
-    // Token that will be throttled, other tokens can be withdrawn freely by owner
-    // If address(0) then ETH will be used
-    SolMateERC20 public immutable throttledToken;
+    uint256 public nextNonce;
+    mapping(uint256 nonce => WithdrawalRequest request) public pendingWithdrawals;
 
-    // Timelock duration in seconds, 0 means no timelock
-    uint256 public timelockDuration;
+    uint256 public lastWithdrawalAt;
+    uint256 public lastRemainingLimit;
+    uint256 public totalPending;
 
-    uint256 public periodStart = 0;
-    uint256 public lastWithdrawalAmount = 0;
+    constructor(address _admin, address _user) {
+        require(_admin != address(0), "admin must be set");
+        require(_user != address(0), "user must be set");
 
-    // Nonce for timelocked withdrawals, incremented for each withdrawal
-    // used as key in pendingWithdrawals
-    // 0 is not used and returned by withdraw() if timelock is disabled
-    uint256 public nonce = 1;
-
-    mapping(uint256 => TimeLock) public pendingWithdrawals;
-    uint256 public totalPending = 0;
-
-    // Internal function to set configuration
-    function _setConfig(
-        uint256 _throttlePeriod,
-        uint256 _withdrawAmountPrPeriod,
-        uint256 _lockDuration
-    ) internal {
-        require(_throttlePeriod != 0, "throttlePeriod must be greater than 0");
-        require(_withdrawAmountPrPeriod != 0, "withdrawAmountPrPeriod must be greater than 0");
-        throttlePeriod = _throttlePeriod;
-        withdrawAmountPrPeriod = _withdrawAmountPrPeriod;
-        timelockDuration = _lockDuration;
-        emit ConfigurationUpdated(_throttlePeriod, _withdrawAmountPrPeriod, _lockDuration);
-    }
-
-    function _withdraw(SolMateERC20 token, uint256 amount) internal {
-        if (address(token) == address(0)) {
-            (bool success, ) = payable(owner).call{ value: amount }("");
-            require(success, "transfer failed");
-        } else {
-            SafeTransferLib.safeTransfer(token, owner, amount);
-        }
-        emit Withdrawal(address(token), owner, amount);
-    }
-
-    function _balance() internal view returns (uint256) {
-        if (address(throttledToken) == address(0)) {
-            return address(this).balance;
-        } else {
-            return throttledToken.balanceOf(address(this));
-        }
-    }
-
-    constructor(
-        uint256 _throttlePeriod,
-        uint256 _withdrawAmountPrPeriod,
-        uint256 _lockDuration,
-        SolMateERC20 _throttledToken
-    ) Owned(msg.sender) {
-        throttledToken = _throttledToken;
-        _setConfig(_throttlePeriod, _withdrawAmountPrPeriod, _lockDuration);
+        _grantRole(DEFAULT_ADMIN_ROLE, _admin);
+        _grantRole(USER_ROLE, _user);
     }
 
     /**
-     * @notice Allows owner to update configuration
-     * @param _throttlePeriod Throttle period in seconds
-     * @param _withdrawAmountPrPeriod Max amount that can be withdrawn per period
-     * @param _lockDuration Timelock duration in seconds, 0 means no timelock
+     * @notice Initiate Withdrawal with a specific amount and target.
+     *         The amount is immediately blocked but can only be withdrawn
+     *         after the timelock period has passed.
      */
-    function setConfig(
-        uint256 _throttlePeriod,
-        uint256 _withdrawAmountPrPeriod,
-        uint256 _lockDuration
-    ) external onlyOwner {
-        _setConfig(_throttlePeriod, _withdrawAmountPrPeriod, _lockDuration);
-    }
-
-    /**
-     * @notice Completes a timelocked withdrawal
-     * @param _nonce Nonce of withdrawal to complete
-     */
-    function completeWithdrawal(uint256 _nonce) external onlyOwner {
-        TimeLock memory timeLock = pendingWithdrawals[_nonce];
-        require(timeLock.amount != 0, "Nothing to withdraw");
-        require(timeLock.unlockTime <= block.timestamp, "Withdrawal is still timelocked");
-        pendingWithdrawals[_nonce].amount = 0;
-        totalPending -= timeLock.amount;
-        _withdraw(throttledToken, timeLock.amount);
-    }
-
-    /**
-     * @notice Withdraws tokens from the contract
-     * @param token Token to withdraw, address(0) for ETH
-     * @param amount Amount to withdraw
-     * @return nonce if withdrawal is timelocked, otherwise 0
-     */
-    function withdraw(SolMateERC20 token, uint256 amount) external onlyOwner returns (uint256) {
+    function initiateWithdrawal(
+        uint256 amount,
+        address target
+    ) external onlyRole(USER_ROLE) returns (uint256) {
         require(amount != 0, "amount must be greater than 0");
-        require(periodStart != block.timestamp, "reentrancy");
-
-        // Allow rescuing tokens
-        if (token != throttledToken) {
-            _withdraw(token, amount);
-            return 0;
-        }
-
-        // Check that there is enough funds for current withdrawal and pending withdrawals
-        require(_balance() >= totalPending + amount, "Not enough funds");
-
-        uint256 timeSincePeriodStart = block.timestamp - periodStart;
-        uint256 accumulatedWithdrawalAmount = (timeSincePeriodStart * withdrawAmountPrPeriod) /
-            throttlePeriod;
-
-        if (accumulatedWithdrawalAmount > lastWithdrawalAmount) {
-            accumulatedWithdrawalAmount = lastWithdrawalAmount;
-        }
-
-        uint256 currentWithdrawalAmount = lastWithdrawalAmount -
-            accumulatedWithdrawalAmount +
-            amount;
-
-        // Check if withdraw amount is within limit
+        require(amount <= amountPerPeriod, "amount must be less than max");
         require(
-            currentWithdrawalAmount <= withdrawAmountPrPeriod,
-            "Withdraw amount exceeds period limit"
+            throttledToken.balanceOf(address(this)) >= totalPending + amount,
+            "insufficient funds"
         );
 
-        periodStart = block.timestamp;
-        lastWithdrawalAmount = currentWithdrawalAmount;
+        uint256 accumulatedWithdrawalAmount = ((block.timestamp - lastWithdrawalAt) *
+            amountPerPeriod) /
+            throttlePeriod +
+            lastRemainingLimit;
 
-        // If timelock is enabled, start timelock and return nonce
-        if (timelockDuration != 0) {
-            uint256 _nonce = nonce++;
-            pendingWithdrawals[_nonce] = TimeLock({
-                amount: amount,
-                unlockTime: block.timestamp + timelockDuration
-            });
-            totalPending += amount;
-
-            emit WithdrawalStarted(
-                address(token),
-                owner,
-                amount,
-                block.timestamp + timelockDuration,
-                _nonce
-            );
-            return _nonce;
-        } else {
-            _withdraw(token, amount);
-            return 0;
+        if (accumulatedWithdrawalAmount > amountPerPeriod) {
+            accumulatedWithdrawalAmount = amountPerPeriod;
         }
+
+        lastWithdrawalAt = block.timestamp;
+        lastRemainingLimit = accumulatedWithdrawalAmount - amount;
+
+        uint256 _nonce = nextNonce++;
+        pendingWithdrawals[_nonce] = WithdrawalRequest({
+            amount: amount,
+            target: target,
+            unlockTime: block.timestamp + timelockDuration,
+            status: WithdrawalStatus.Pending
+        });
+        totalPending += amount;
+
+        emit WithdrawalInitiated(_nonce, target, amount, block.timestamp + timelockDuration);
+
+        return _nonce;
     }
 
-    receive() external payable {}
+    /**
+     * @notice Allows completing a withdrawal after the timelock period has passed.
+     *         Only the user can complete a withdrawal.
+     * @dev Does not impact the throttle.
+     */
+    function completeWithdrawal(uint256 _nonce) external onlyRole(USER_ROLE) {
+        require(_nonce < nextNonce, "invalid nonce");
+
+        WithdrawalRequest storage withdrawal = pendingWithdrawals[_nonce];
+
+        require(withdrawal.amount != 0, "withdrawal does not exist");
+        require(withdrawal.unlockTime <= block.timestamp, "withdrawal is still locked");
+        require(withdrawal.status == WithdrawalStatus.Pending, "withdrawal is not pending");
+
+        totalPending -= withdrawal.amount;
+        withdrawal.status = WithdrawalStatus.Completed;
+
+        throttledToken.safeTransfer(withdrawal.target, withdrawal.amount);
+
+        emit WithdrawalCompleted(_nonce);
+    }
+
+    /**
+     * @notice Allows cancelling a withdrawal if it has not been completed already.
+     *         Only the admin can cancel a withdrawal.
+     * @dev The throttle is NOT recharged on cancellation.
+     */
+    function cancelWithdrawal(uint256 _nonce) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_nonce < nextNonce, "invalid nonce");
+
+        WithdrawalRequest storage withdrawal = pendingWithdrawals[_nonce];
+
+        require(withdrawal.status == WithdrawalStatus.Pending, "withdrawal is not pending");
+
+        totalPending -= withdrawal.amount;
+        withdrawal.status = WithdrawalStatus.Cancelled;
+
+        emit WithdrawalCancelled(_nonce);
+    }
 }

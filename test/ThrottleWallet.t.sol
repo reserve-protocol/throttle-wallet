@@ -73,6 +73,12 @@ contract ThrottleWalletTest is Test {
 
         assertEq(token.balanceOf(address(throttleWallet)), 1_999_999_000 ether);
         assertEq(token.balanceOf(user_target), 1_000 ether);
+
+        vm.expectRevert();
+        throttleWallet.completeWithdrawal(0);
+
+        assertEq(token.balanceOf(address(throttleWallet)), 1_999_999_000 ether);
+        assertEq(token.balanceOf(user_target), 1_000 ether);
     }
 
     function test_WithdrawalCancellation() public {

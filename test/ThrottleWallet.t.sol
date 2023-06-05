@@ -135,8 +135,6 @@ contract ThrottleWalletTest is Test {
     function test_LinearAccumulator() public {
         vm.startPrank(user_user);
 
-        console2.log(throttleWallet.availableToWithdraw());
-
         // Drain the entire throttle!
         throttleWallet.initiateWithdrawal(1_000_000_000 ether, user_target);
 
@@ -148,8 +146,8 @@ contract ThrottleWalletTest is Test {
         vm.expectRevert();
         throttleWallet.initiateWithdrawal(1, user_target);
 
-        // 15 days in, we should be able to withdraw half of it.
-        vm.warp(1686000000 + 15 days);
+        // 2 weeks in, we should be able to withdraw half of it.
+        vm.warp(1686000000 + 2 weeks);
         throttleWallet.initiateWithdrawal(500_000_000 ether, user_target);
 
         assertEq(token.balanceOf(address(throttleWallet)), 2_000_000_000 ether);
@@ -164,15 +162,16 @@ contract ThrottleWalletTest is Test {
         vm.expectRevert();
         throttleWallet.completeWithdrawal(1);
 
+        // Another week in, throttle is not fully charged yet.
+        vm.warp(1686000000 + 4 weeks + 1 weeks);
+        assertEq(throttleWallet.availableToWithdraw(), 750_000_000 ether);
+
         // Now we can complete the second one.
-        vm.warp(1686000000 + 4 weeks + 15 days);
+        vm.warp(1686000000 + 4 weeks + 2 weeks);
         throttleWallet.completeWithdrawal(1);
 
-        // Although the throttle is NOT full charged yet (2 more days remaining)
-        vm.expectRevert();
-        throttleWallet.initiateWithdrawal(1_000_000_000 ether, user_target);
-
-        console2.log(throttleWallet.availableToWithdraw());
+        // The throttle is now full charged
+        assertEq(throttleWallet.availableToWithdraw(), 1_000_000_000 ether);
     }
 
     function test_AccessControl_AdminLimits() public {

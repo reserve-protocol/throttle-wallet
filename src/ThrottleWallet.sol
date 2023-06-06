@@ -42,7 +42,7 @@ contract ThrottleWallet is AccessControl {
      * @notice Parameters
      * @dev Intentionally hardcoded
      */
-    IERC20 public immutable throttledToken;
+    IERC20 public constant throttledToken = IERC20(0x320623b8E4fF03373931769A31Fc52A4E78B5d70); // RSR
     uint256 public constant throttlePeriod = 4 weeks;
     uint256 public constant amountPerPeriod = 1_000_000_000 * (10 ** 18); // (at most) 1B every 4 weeks, throttled
     uint256 public constant timelockDuration = 4 weeks;
@@ -57,11 +57,9 @@ contract ThrottleWallet is AccessControl {
     uint256 public lastRemainingLimit;
     uint256 public totalPending;
 
-    constructor(IERC20 _token, address _admin, address _user) {
+    constructor(address _admin, address _user) {
         require(_admin != address(0), "admin must be set");
         require(_user != address(0), "user must be set");
-
-        throttledToken = _token;
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(USER_ROLE, _user);

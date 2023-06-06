@@ -7,6 +7,7 @@
   "scripts": {
     "test": "forge test",
     "debug": "forge test -vvv",
-    "trace": "forge test -vvvvv"
+    "trace": "forge test -vvvvv",
+    "deploy": "forge script script/Deploy.s.sol:DeployScript --broadcast --verify --rpc-url https://rpc.ankr.com/eth"
   }
 }

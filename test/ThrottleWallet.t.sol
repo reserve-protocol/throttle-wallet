@@ -113,8 +113,8 @@ contract ThrottleWalletTest is Test {
 
     function test_AccessControl() public {
         vm.startPrank(address(4));
-        vm.expectRevert();
 
+        vm.expectRevert();
         throttleWallet.initiateWithdrawal(1_000 ether, user_target);
 
         // Still expected to fail since admin can NOT create withdrawals
@@ -177,43 +177,29 @@ contract ThrottleWalletTest is Test {
         assertEq(throttleWallet.availableToWithdraw(), 1_000_000_000 ether);
     }
 
-    function test_AccessControl_AdminLimits() public {
+    function test_AccessControl_ChangeUser() public {
         vm.startPrank(user_admin);
 
-        bytes32 DEFAULT_ADMIN_ROLE = 0x00;
-        bytes32 USER_ROLE = keccak256("USER_ROLE");
+        // No change for user, already user_user
+        vm.expectRevert();
+        throttleWallet.changeUser(user_user);
 
-        vm.expectRevert();
-        throttleWallet.grantRole(DEFAULT_ADMIN_ROLE, address(4));
-        vm.expectRevert();
-        throttleWallet.revokeRole(DEFAULT_ADMIN_ROLE, address(4));
-        vm.expectRevert();
-        throttleWallet.renounceRole(DEFAULT_ADMIN_ROLE, address(4));
+        // Change user
+        throttleWallet.changeUser(address(5));
+        vm.prank(address(5));
 
-        // But everyting is ok for user role
-        throttleWallet.grantRole(USER_ROLE, address(4));
-        throttleWallet.revokeRole(USER_ROLE, address(4));
+        // But user can't change user.
+        vm.expectRevert();
+        throttleWallet.changeUser(address(4));
 
-        throttleWallet.grantRole(USER_ROLE, address(4));
-        vm.startPrank(address(4));
-        throttleWallet.renounceRole(USER_ROLE, address(4));
+        vm.startPrank(user_admin);
+        throttleWallet.changeUser(user_user);
 
-        // Another user with no perms.
-        vm.startPrank(address(5));
-        vm.expectRevert();
-        throttleWallet.revokeRole(USER_ROLE, address(4));
-        vm.expectRevert();
-        throttleWallet.renounceRole(USER_ROLE, address(4));
+        assertEq(throttleWallet.user(), user_user);
 
-        // User can't do anything to the admin either.
-        vm.startPrank(user_user);
+        // Random person can't do anything.
+        vm.startPrank(address(6));
         vm.expectRevert();
-        throttleWallet.grantRole(DEFAULT_ADMIN_ROLE, address(4));
-        vm.expectRevert();
-        throttleWallet.revokeRole(DEFAULT_ADMIN_ROLE, address(4));
-        vm.expectRevert();
-        throttleWallet.revokeRole(DEFAULT_ADMIN_ROLE, user_admin);
-        vm.expectRevert();
-        throttleWallet.renounceRole(DEFAULT_ADMIN_ROLE, address(4));
+        throttleWallet.changeUser(address(6));
     }
 }

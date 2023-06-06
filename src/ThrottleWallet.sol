@@ -3,9 +3,8 @@ pragma solidity ^0.8.19;
 
 import { IERC20 } from "@openzeppelin/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
-import { AccessControl } from "@openzeppelin/access/AccessControl.sol";
 
-contract ThrottleWallet is AccessControl {
+contract ThrottleWallet {
     using SafeERC20 for IERC20;
 
     bytes32 public constant USER_ROLE = keccak256("USER_ROLE");
@@ -57,12 +56,25 @@ contract ThrottleWallet is AccessControl {
     uint256 public lastRemainingLimit;
     uint256 public totalPending;
 
+    address public immutable admin;
+    address public user;
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "admin only");
+        _;
+    }
+
+    modifier onlyUser() {
+        require(msg.sender == user, "user only");
+        _;
+    }
+
     constructor(address _admin, address _user) {
         require(_admin != address(0), "admin must be set");
         require(_user != address(0), "user must be set");
 
-        _grantRole(DEFAULT_ADMIN_ROLE, _admin);
-        _grantRole(USER_ROLE, _user);
+        admin = _admin;
+        user = _user;
     }
 
     /**
@@ -88,7 +100,7 @@ contract ThrottleWallet is AccessControl {
     function initiateWithdrawal(
         uint256 amount,
         address target
-    ) external onlyRole(USER_ROLE) returns (uint256) {
+    ) external onlyUser returns (uint256) {
         require(amount != 0, "amount must be greater than 0");
         require(
             throttledToken.balanceOf(address(this)) >= totalPending + amount,
@@ -143,7 +155,7 @@ contract ThrottleWallet is AccessControl {
      *         Only the admin can cancel a withdrawal.
      * @dev The throttle is NOT recharged on cancellation.
      */
-    function cancelWithdrawal(uint256 _nonce) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function cancelWithdrawal(uint256 _nonce) external onlyAdmin {
         require(_nonce < nextNonce, "invalid nonce");
 
         WithdrawalRequest storage withdrawal = pendingWithdrawals[_nonce];
@@ -157,24 +169,12 @@ contract ThrottleWallet is AccessControl {
     }
 
     /**
-     * @notice Overrides
-     * @dev Admin role cannot be granted, revoked or renounced.
+     * @notice Access Control
+     * @dev Admin role can NOT be changed, admin can change user role.
      */
-    function grantRole(bytes32 role, address account) public override {
-        require(role != DEFAULT_ADMIN_ROLE, "admin role cannot be granted");
+    function changeUser(address _newUser) external onlyAdmin {
+        require(_newUser != user, "new user can not be the same");
 
-        super.grantRole(role, account);
-    }
-
-    function revokeRole(bytes32 role, address account) public override {
-        require(role != DEFAULT_ADMIN_ROLE, "admin role cannot be revoked");
-
-        super.revokeRole(role, account);
-    }
-
-    function renounceRole(bytes32 role, address account) public override {
-        require(role != DEFAULT_ADMIN_ROLE, "admin role cannot be renounced");
-
-        super.renounceRole(role, account);
+        user = _newUser;
     }
 }

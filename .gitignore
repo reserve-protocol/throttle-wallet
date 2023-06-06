@@ -12,6 +12,7 @@ docs/
 
 # Dotenv file
 .env
+.secret
 
 # Node
 node_modules

@@ -34,9 +34,12 @@ contract ThrottleWalletTest is Test {
     MintableERC20 public token;
 
     function setUp() public {
-        token = new MintableERC20("RSR", "RSR");
-        throttleWallet = new ThrottleWallet(token, user_admin, user_user);
+        MintableERC20 _token = new MintableERC20("RSR", "RSR");
+        vm.etch(0x320623b8E4fF03373931769A31Fc52A4E78B5d70, address(_token).code);
 
+        throttleWallet = new ThrottleWallet(user_admin, user_user);
+
+        token = MintableERC20(0x320623b8E4fF03373931769A31Fc52A4E78B5d70);
         token.mint(address(throttleWallet), 2_000_000_000 ether);
 
         vm.warp(1686000000);

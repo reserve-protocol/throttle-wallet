@@ -36,6 +36,7 @@ contract ThrottleWallet {
     );
     event WithdrawalCompleted(uint256 indexed nonce);
     event WithdrawalCancelled(uint256 indexed nonce);
+    event UserChanged(address indexed previousUser, address indexed newUser);
 
     /**
      * @notice Parameters
@@ -175,6 +176,7 @@ contract ThrottleWallet {
     function changeUser(address _newUser) external onlyAdmin {
         require(_newUser != user, "new user can not be the same");
 
+        emit UserChanged(user, _newUser);
         user = _newUser;
     }
 }

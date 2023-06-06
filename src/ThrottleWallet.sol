@@ -43,8 +43,8 @@ contract ThrottleWallet is AccessControl {
      * @dev Intentionally hardcoded
      */
     IERC20 public immutable throttledToken;
-    uint256 public constant throttlePeriod = 30 days;
-    uint256 public constant amountPerPeriod = 1_000_000_000 * (10 ** 18); // (at most) 1B every 30 days, throttled
+    uint256 public constant throttlePeriod = 4 weeks;
+    uint256 public constant amountPerPeriod = 1_000_000_000 * (10 ** 18); // (at most) 1B every 4 weeks, throttled
     uint256 public constant timelockDuration = 4 weeks;
 
     /**

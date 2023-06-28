@@ -32,6 +32,7 @@ contract ThrottleWallet {
     event WithdrawalCompleted(uint256 indexed nonce);
     event WithdrawalCancelled(uint256 indexed nonce);
     event UserChanged(address indexed previousUser, address indexed newUser);
+    event AdminChanged(address indexed previousAdmin, address indexed newAdmin);
 
     /**
      * @notice Parameters
@@ -170,7 +171,7 @@ contract ThrottleWallet {
     }
 
     function renounceAdmin() external onlyAdmin {
-        emit UserChanged(user, address(0));
+        emit AdminChanged(admin, address(0));
 
         admin = address(0);
     }

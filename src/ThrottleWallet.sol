@@ -28,12 +28,7 @@ contract ThrottleWallet {
     /**
      * @notice Events
      */
-    event WithdrawalInitiated(
-        uint256 indexed nonce,
-        address indexed to,
-        uint256 amount,
-        uint256 unlockTime
-    );
+    event WithdrawalInitiated(uint256 indexed nonce, address indexed to, uint256 amount, uint256 unlockTime);
     event WithdrawalCompleted(uint256 indexed nonce);
     event WithdrawalCancelled(uint256 indexed nonce);
     event UserChanged(address indexed previousUser, address indexed newUser);
@@ -57,7 +52,7 @@ contract ThrottleWallet {
     uint256 public lastRemainingLimit;
     uint256 public totalPending;
 
-    address public immutable admin;
+    address public admin;
     address public user;
 
     modifier onlyAdmin() {
@@ -83,8 +78,8 @@ contract ThrottleWallet {
      */
     function availableToWithdraw() public view returns (uint256) {
         uint256 timeSinceLastWithdrawal = block.timestamp - lastWithdrawalAt;
-        uint256 accumulatedWithdrawalAmount = ((timeSinceLastWithdrawal * amountPerPeriod) /
-            throttlePeriod) + lastRemainingLimit;
+        uint256 accumulatedWithdrawalAmount =
+            ((timeSinceLastWithdrawal * amountPerPeriod) / throttlePeriod) + lastRemainingLimit;
 
         if (accumulatedWithdrawalAmount > amountPerPeriod) {
             accumulatedWithdrawalAmount = amountPerPeriod;
@@ -98,15 +93,9 @@ contract ThrottleWallet {
      *         The amount is immediately blocked but can only be withdrawn
      *         after the timelock period has passed.
      */
-    function initiateWithdrawal(
-        uint256 amount,
-        address target
-    ) external onlyUser returns (uint256) {
+    function initiateWithdrawal(uint256 amount, address target) external onlyUser returns (uint256) {
         require(amount != 0, "amount must be greater than 0");
-        require(
-            throttledToken.balanceOf(address(this)) >= totalPending + amount,
-            "insufficient funds"
-        );
+        require(throttledToken.balanceOf(address(this)) >= totalPending + amount, "insufficient funds");
 
         uint256 accumulatedWithdrawalAmount = availableToWithdraw();
 
@@ -171,12 +160,18 @@ contract ThrottleWallet {
 
     /**
      * @notice Access Control
-     * @dev Admin role can NOT be changed, admin can change user role.
+     * @dev Admin role can NOT be changed (only renounced), admin can change user role.
      */
     function changeUser(address _newUser) external onlyAdmin {
         require(_newUser != user, "new user can not be the same");
 
         emit UserChanged(user, _newUser);
         user = _newUser;
+    }
+
+    function renounceAdmin() external onlyAdmin {
+        emit UserChanged(user, address(0));
+
+        admin = address(0);
     }
 }

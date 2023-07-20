@@ -8,7 +8,7 @@ import { ThrottleWallet } from "../src/ThrottleWallet.sol";
 import { ERC20 } from "@openzeppelin/token/ERC20/ERC20.sol";
 
 contract MintableERC20 is ERC20 {
-    constructor(string memory _name, string memory _symbol) ERC20(_name, _symbol) {}
+    constructor(string memory _name, string memory _symbol) ERC20(_name, _symbol) { }
 
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
@@ -21,12 +21,7 @@ contract ThrottleWalletTest is Test {
 
     address user_target = address(0x3);
 
-    event WithdrawalInitiated(
-        uint256 indexed nonce,
-        address indexed to,
-        uint256 amount,
-        uint256 unlockTime
-    );
+    event WithdrawalInitiated(uint256 indexed nonce, address indexed to, uint256 amount, uint256 unlockTime);
     event WithdrawalCompleted(uint256 indexed nonce);
     event WithdrawalCancelled(uint256 indexed nonce);
 
@@ -199,6 +194,12 @@ contract ThrottleWalletTest is Test {
 
         // Random person can't do anything.
         vm.startPrank(address(6));
+        vm.expectRevert();
+        throttleWallet.changeUser(address(6));
+
+        // Renounce Admin
+        vm.startPrank(user_admin);
+        throttleWallet.renounceAdmin();
         vm.expectRevert();
         throttleWallet.changeUser(address(6));
     }

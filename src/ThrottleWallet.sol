@@ -7,8 +7,6 @@ import { SafeERC20 } from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 contract ThrottleWallet {
     using SafeERC20 for IERC20;
 
-    bytes32 public constant USER_ROLE = keccak256("USER_ROLE");
-
     /**
      * @notice Structs
      */

@@ -91,6 +91,10 @@ contract ThrottleWalletTest is Test {
         vm.expectRevert();
         throttleWallet.completeWithdrawal(0);
 
+        vm.startPrank(user_user);
+        vm.expectRevert();
+        throttleWallet.cancelWithdrawal(0);
+
         vm.startPrank(user_admin);
         vm.expectEmit();
         emit WithdrawalCancelled(0);

@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import "forge-std/Test.sol";
 import "forge-std/console2.sol";
 
-import { ISlowWallet } from "./interfaces/SlowWallet.sol";
+import { ISlowWallet } from "./interfaces/ISlowWallet.sol";
 import { ThrottleWallet } from "../src/ThrottleWallet.sol";
 import { IERC20, ERC20 } from "@openzeppelin/token/ERC20/ERC20.sol";
 

@@ -52,6 +52,7 @@ contract ThrottleWalletTest is Test {
         assertEq(token.balanceOf(address(throttleWallet)), 2_000_000_000 ether);
         assertEq(token.balanceOf(address(this)), 0);
         assertEq(throttleWallet.totalPending(), 1_000 ether);
+        vm.stopPrank();
     }
 
     function test_WithdrawalTimelock() public {
@@ -79,6 +80,7 @@ contract ThrottleWalletTest is Test {
 
         assertEq(token.balanceOf(address(throttleWallet)), 1_999_999_000 ether);
         assertEq(token.balanceOf(user_target), 1_000 ether);
+        vm.stopPrank();
     }
 
     function test_WithdrawalCancellation() public {
@@ -92,10 +94,12 @@ contract ThrottleWalletTest is Test {
         vm.warp(START_TIME + 4 weeks - 1);
         vm.expectRevert();
         throttleWallet.completeWithdrawal(0);
+        vm.stopPrank();
 
         vm.startPrank(user_user);
         vm.expectRevert();
         throttleWallet.cancelWithdrawal(0);
+        vm.stopPrank();
 
         vm.startPrank(user_admin);
         vm.expectEmit();
@@ -110,6 +114,7 @@ contract ThrottleWalletTest is Test {
         assertEq(token.balanceOf(address(throttleWallet)), 2_000_000_000 ether);
         assertEq(token.balanceOf(address(this)), 0);
         assertEq(throttleWallet.totalPending(), 0);
+        vm.stopPrank();
     }
 
     function test_AccessControl() public {
@@ -117,6 +122,7 @@ contract ThrottleWalletTest is Test {
 
         vm.expectRevert();
         throttleWallet.initiateWithdrawal(1_000 ether, user_target);
+        vm.stopPrank();
 
         // Still expected to fail since admin can NOT create withdrawals
         vm.startPrank(user_admin);
@@ -126,6 +132,7 @@ contract ThrottleWalletTest is Test {
         assertEq(token.balanceOf(address(throttleWallet)), 2_000_000_000 ether);
         assertEq(token.balanceOf(address(this)), 0);
         assertEq(throttleWallet.totalPending(), 0);
+        vm.stopPrank();
 
         // ...but user can!
         vm.startPrank(user_user);
@@ -134,6 +141,7 @@ contract ThrottleWalletTest is Test {
         assertEq(token.balanceOf(address(throttleWallet)), 2_000_000_000 ether);
         assertEq(token.balanceOf(address(this)), 0);
         assertEq(throttleWallet.totalPending(), 1_000 ether);
+        vm.stopPrank();
     }
 
     function test_LinearAccumulator() public {
@@ -176,6 +184,7 @@ contract ThrottleWalletTest is Test {
 
         // The throttle is now full charged
         assertEq(throttleWallet.availableToWithdraw(), 1_000_000_000 ether);
+        vm.stopPrank();
     }
 
     function test_AccessControl_ChangeUser() public {
@@ -187,24 +196,26 @@ contract ThrottleWalletTest is Test {
 
         // Change user
         throttleWallet.changeUser(address(5));
+        vm.stopPrank();
+
         vm.prank(address(5));
 
         // But user can't change user.
         vm.expectRevert();
         throttleWallet.changeUser(address(4));
 
-        vm.startPrank(user_admin);
+        vm.prank(user_admin);
         throttleWallet.changeUser(user_user);
 
         assertEq(throttleWallet.user(), user_user);
 
         // Random person can't do anything.
-        vm.startPrank(address(6));
+        vm.prank(address(6));
         vm.expectRevert();
         throttleWallet.changeUser(address(6));
 
         // Renounce Admin
-        vm.startPrank(user_admin);
+        vm.prank(user_admin);
         throttleWallet.renounceAdmin();
         vm.expectRevert();
         throttleWallet.changeUser(address(6));

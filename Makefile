@@ -8,6 +8,6 @@ certora: FORCE
 		src/ThrottleWallet.sol \
 		--packages "@openzeppelin=lib/openzeppelin-contracts/contracts" \
 		--verify ThrottleWallet:certora/ThrottleWallet.spec \
-		$(if $(rule), --rule $(rule),)
+		$(if $(rule),--rule $(rule),)
 
 FORCE:

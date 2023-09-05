@@ -42,3 +42,18 @@ rule renounceAdmin() {
     assert lastRemainingLimitBefore == lastRemainingLimit(), "renounceAdmin changed lastRemainingLimit unexpectedly";
     assert totalPendingBefore == totalPending(), "renounceAdmin changed totalPending unexpectedly";
 }
+
+rule renounceAdmin_revert() {
+    env e;
+
+    address adminBefore = admin();
+
+    renounceAdmin@withrevert(e);
+
+    bool revert1 = e.msg.value > 0;
+    bool revert2 = e.msg.sender != adminBefore;
+
+    assert revert1 => lastReverted, "revert1 falied";
+    assert revert2 => lastReverted, "revert2 failed";
+    assert lastReverted => revert1 || revert2, "not all reversion cases are covered";
+}

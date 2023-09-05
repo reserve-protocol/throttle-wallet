@@ -8,6 +8,59 @@ methods {
     function user()  external returns (address) envfree;
 }
 
+// --- function-specific rules ---
+
+rule changeUser(address newUser) {
+    env e;
+
+    address adminBefore = admin();
+    uint256 nextNonceBefore = nextNonce();
+    uint256 anyUint256;
+    uint256 amountBefore;
+    address targetBefore;
+    uint256 unlockTimeBefore;
+    ThrottleWallet.WithdrawalStatus statusBefore;
+    amountBefore, targetBefore, unlockTimeBefore, statusBefore = pendingWithdrawals(anyUint256);
+    uint256 lastWithdrawalAtBefore = lastWithdrawalAt();
+    uint256 lastRemainingLimitBefore = lastRemainingLimit();
+    uint256 totalPendingBefore = totalPending();
+
+    changeUser(e, newUser);
+
+    assert user() == newUser, "changeUser did not set user correctly";
+    assert admin() == adminBefore, "changeUser changed admin unexpectedly";
+    assert nextNonceBefore == nextNonce(), "changeUser changed nextNonce unexpectedly";
+    uint256 amountAfter;
+    address targetAfter;
+    uint256 unlockTimeAfter;
+    ThrottleWallet.WithdrawalStatus statusAfter;
+    amountAfter, targetAfter, unlockTimeAfter, statusAfter = pendingWithdrawals(anyUint256);
+    assert amountBefore == amountAfter, "changeUser changed some withdrawal amount unexpectedly";
+    assert targetBefore == targetAfter, "changeUser changed some withdrawal target unexpectedly";
+    assert unlockTimeBefore == unlockTimeAfter, "changeUser changed some withdrawal unlockTime unexpectedly";
+    assert statusBefore == statusAfter, "changeUser changed some withdrawal status unexpectedly";
+    assert lastWithdrawalAtBefore == lastWithdrawalAt(), "changeUser changed lastWithdrawal unexpectedly";
+    assert lastRemainingLimitBefore == lastRemainingLimit(), "changeUser changed lastRemainingLimit unexpectedly";
+    assert totalPendingBefore == totalPending(), "changeUser changed totalPending unexpectedly";
+}
+
+rule changeUser_revert(address newUser) {
+    env e;
+
+    address adminBefore = admin();
+    address userBefore  = user();
+
+    changeUser@withrevert(e, newUser);
+
+    bool revert1 = e.msg.value > 0;
+    bool revert2 = e.msg.sender != adminBefore;
+    bool revert3 = newUser == userBefore;
+    assert revert1 => lastReverted, "revert1 failed";
+    assert revert2 => lastReverted, "revert2 failed";
+    assert revert3 => lastReverted, "revert3 failed";
+    assert lastReverted => revert1 || revert2 || revert3, "not all reversion cases are covered";
+}
+
 rule renounceAdmin() {
     env e;
 
@@ -25,8 +78,7 @@ rule renounceAdmin() {
 
     renounceAdmin(e);
 
-    address adminAfter = admin();
-    assert adminAfter == 0, "renounceAdmin did not set admin to address(0)";
+    assert admin() == 0, "renounceAdmin did not set admin to address(0)";
     assert userBefore == user(), "renounceAdmin changed user unexpectedly";
     assert nextNonceBefore == nextNonce(), "renounceAdmin changed nextNonce unexpectedly";
     uint256 amountAfter;
@@ -57,3 +109,5 @@ rule renounceAdmin_revert() {
     assert revert2 => lastReverted, "revert2 failed";
     assert lastReverted => revert1 || revert2, "not all reversion cases are covered";
 }
+
+// --- multi-function properties ---

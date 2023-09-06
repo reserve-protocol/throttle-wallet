@@ -140,3 +140,6 @@ rule renouncing_ownership_is_final_and_makes_user_immutable(method f) {
     assert admin() == 0, "admin changed after being renounced";
     assert user() == userBefore, "user changed after admin renounced";
 }
+
+invariant lastRemainingLimit_bounded_by_amountPerPeriod()
+    lastRemainingLimit() < amountPerPeriod();

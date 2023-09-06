@@ -128,14 +128,15 @@ rule renounceAdmin_revert() {
 // Note: this fails when sanity checking rules is enabled because some functions
 // simply revert when admin is the zero address.
 rule renouncing_ownership_is_final_and_makes_user_immutable(method f) {
-    env e;
-    calldataarg args;
+    env e1;
+    renounceAdmin(e1);
 
-    require admin() == 0;  // using this as definition of "ownership renounced"; coverd by renounceAdmin rule
-    require e.msg.sender != 0;  // exclude the 0 address as a valid sender
+    env e2;
+    calldataarg args;
+    require e2.msg.sender != 0;  // exclude the 0 address as a valid sender
     address userBefore = user();
 
-    f(e, args);
+    f(e2, args);
 
     assert admin() == 0, "admin changed after being renounced";
     assert user() == userBefore, "user changed after admin renounced";

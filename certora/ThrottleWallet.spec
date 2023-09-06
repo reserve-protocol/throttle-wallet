@@ -154,6 +154,14 @@ rule initiateWithdrawal_revert(uint256 amount, address target) {
                            revert9 || revert10 || revert11, "not all reversion cases are covered";
 }
 
+// Technically covered by initiateWithdrawal_revert, but this is a good property to make explicit.
+rule single_withdrawal_cannot_exceed_amountPerPeriod(uint256 amount, address target) {
+    uint256 amountPerPeriod_ = amountPerPeriod();
+    env e;
+    initiateWithdrawal@withrevert(e, amount, target);
+    assert amount > amountPerPeriod_ => lastReverted, "initiateWithdrawal did not revert when amount > amountPerPeriod";
+}
+
 rule completeWithdrawal(uint256 nonce) {
     env e;
 
@@ -207,14 +215,6 @@ rule completeWithdrawal(uint256 nonce) {
     assert targetOtherNonceBefore == targetOtherNonceAfter, "completeWithdrawal changed the target of another nonce unexpectedly";
     assert unlockTimeOtherNonceBefore == unlockTimeOtherNonceAfter, "completeWithdrawal changed the unlockTime of another nonce unexpectedly";
     assert statusOtherNonceBefore == statusOtherNonceAfter, "completeWithdrawal changed the status of another nonce unexpectedly";
-}
-
-// Technically covered by initiateWithdrawal_revert, but this is a good property to make explicit.
-rule single_withdrawal_cannot_exceed_amountPerPeriod(uint256 amount, address target) {
-    uint256 amountPerPeriod_ = amountPerPeriod();
-    env e;
-    initiateWithdrawal@withrevert(e, amount, target);
-    assert amount > amountPerPeriod_ => lastReverted, "initiateWithdrawal did not revert when amount > amountPerPeriod";
 }
 
 rule changeUser(address newUser) {

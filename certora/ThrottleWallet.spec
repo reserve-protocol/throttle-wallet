@@ -35,6 +35,26 @@ rule availableToWithdraw() {
     assert accumulatedWithdrawalAmount == expectedAccumulatedWithdrawalAmount, "availableToWithdraw returned the wrong value";
 }
 
+rule availableToWithdraw_revert() {
+    env e;
+
+    mathint timeSinceLastWithdrawal = e.block.timestamp - lastWithdrawalAt();
+    mathint product = timeSinceLastWithdrawal * amountPerPeriod();
+    mathint unlimitedAccumulatedAmount = product / throttlePeriod() + lastRemainingLimit();
+
+    availableToWithdraw@withrevert(e);
+
+    bool revert1 = e.msg.value > 0;
+    bool revert2 = timeSinceLastWithdrawal < 0;
+    bool revert3 = product > max_uint256;
+    bool revert4 = unlimitedAccumulatedAmount > max_uint256;
+    assert revert1 => lastReverted, "revert1 falied";
+    assert revert2 => lastReverted, "revert2 failed";
+    assert revert3 => lastReverted, "revert3 failed";
+    assert revert4 => lastReverted, "revert4 falied";
+    assert lastReverted => revert1 || revert2 || revert3 || revert4, "not all reversion cases are covered";
+}
+
 rule changeUser(address newUser) {
     env e;
 

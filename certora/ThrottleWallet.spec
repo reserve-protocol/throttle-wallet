@@ -301,6 +301,33 @@ rule cancelWithdrawal(uint256 nonce) {
     assert statusOtherNonceBefore == statusOtherNonceAfter, "cancelWithdrawal changed the status of another nonce unexpectedly";
 }
 
+rule cancelWithdrawal_revert(uint256 nonce) {
+    address admin_ = admin();
+    uint256 nextNonce_ = nextNonce();
+    uint256 totalPending_ = totalPending();
+    uint256 amount;
+    address target;
+    uint256 unlockTime;
+    ThrottleWallet.WithdrawalStatus status;
+    amount, target, unlockTime, status = pendingWithdrawals(nonce);
+
+    env e;
+    cancelWithdrawal@withrevert(e, nonce);
+
+    bool revert1 = e.msg.value > 0;
+    bool revert2 = e.msg.sender != admin_;
+    bool revert3 = nonce >= nextNonce_;
+    bool revert4 = status != ThrottleWallet.WithdrawalStatus.Pending;
+    bool revert5 = amount > totalPending_;
+    assert revert1 => lastReverted, "revert1  failed";
+    assert revert2 => lastReverted, "revert2  failed";
+    assert revert3 => lastReverted, "revert3  failed";
+    assert revert4 => lastReverted, "revert4  failed";
+    assert revert5 => lastReverted, "revert5  failed";
+    assert lastReverted => revert1 || revert2  || revert3 || revert4 ||
+                           revert5 , "not all reversion cases are covered";
+}
+
 rule changeUser(address newUser) {
     env e;
 

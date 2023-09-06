@@ -154,6 +154,61 @@ rule initiateWithdrawal_revert(uint256 amount, address target) {
                            revert9 || revert10 || revert11, "not all reversion cases are covered";
 }
 
+rule completeWithdrawal(uint256 nonce) {
+    env e;
+
+    mathint totalPendingBefore = totalPending();
+
+    address adminBefore = admin();
+    address userBefore  = user();
+    uint256 lastWithdrawalAtBefore = lastWithdrawalAt();
+    uint256 lastRemainingLimitBefore = lastRemainingLimit();
+    uint256 nextNonceBefore = nextNonce();
+    uint256 amountNonceBefore;
+    address targetNonceBefore;
+    uint256 unlockTimeNonceBefore;
+    ThrottleWallet.WithdrawalStatus statusNonceBefore;  // unused
+    amountNonceBefore, targetNonceBefore, unlockTimeNonceBefore, statusNonceBefore = pendingWithdrawals(nonce);
+    uint256 otherNonce;
+    require otherNonce != nonce;
+    uint256 amountOtherNonceBefore;
+    address targetOtherNonceBefore;
+    uint256 unlockTimeOtherNonceBefore;
+    ThrottleWallet.WithdrawalStatus statusOtherNonceBefore;
+    amountOtherNonceBefore, targetOtherNonceBefore, unlockTimeOtherNonceBefore, statusOtherNonceBefore = pendingWithdrawals(otherNonce);
+
+    completeWithdrawal(e, nonce);
+
+    uint256 amountNonceAfter;
+    address targetNonceAfter;
+    uint256 unlockTimeNonceAfter;
+    ThrottleWallet.WithdrawalStatus statusNonceAfter;
+    amountNonceAfter, targetNonceAfter, unlockTimeNonceAfter, statusNonceAfter = pendingWithdrawals(nonce);
+
+    // checks for modified values
+    assert to_mathint(totalPending()) == totalPendingBefore - amountNonceBefore, "completeWithdrawal did not update totalPending as expected";
+    assert unlockTimeNonceAfter == unlockTimeNonceBefore, "completeWithdrawal changed the withdrawal unlock time unexpectedly";
+
+    // checks for preserved values
+    assert amountNonceAfter == amountNonceBefore, "completeWithdrawal changed the withdrawal amount unexpectedly";
+    assert targetNonceAfter == targetNonceBefore, "completeWithdrawal changed the withdrawal target unexpectedly";
+    assert statusNonceAfter == ThrottleWallet.WithdrawalStatus.Completed, "completeWithdrawal did not set the withdrawal status correctly";
+    assert admin() == adminBefore, "completeWithdrawal changed admin unexpectedly";
+    assert user()  == userBefore, "completeWithdrawal changed user unexpectedly";
+    assert lastWithdrawalAt() == lastWithdrawalAtBefore , "completeWithdrawal changed lastWithdrawalAt unexpectedly";
+    assert lastRemainingLimit() == lastRemainingLimitBefore , "completeWithdrawal changed lastRemainingLimit unexpectedly";
+    assert nextNonce() == nextNonceBefore, "completeWithdrawal changed nextNonce expectedly";
+    uint256 amountOtherNonceAfter;
+    address targetOtherNonceAfter;
+    uint256 unlockTimeOtherNonceAfter;
+    ThrottleWallet.WithdrawalStatus statusOtherNonceAfter;
+    amountOtherNonceAfter, targetOtherNonceAfter, unlockTimeOtherNonceAfter, statusOtherNonceAfter = pendingWithdrawals(otherNonce);
+    assert amountOtherNonceBefore == amountOtherNonceAfter, "completeWithdrawal changed the amount of another nonce unexpectedly";
+    assert targetOtherNonceBefore == targetOtherNonceAfter, "completeWithdrawal changed the target of another nonce unexpectedly";
+    assert unlockTimeOtherNonceBefore == unlockTimeOtherNonceAfter, "completeWithdrawal changed the unlockTime of another nonce unexpectedly";
+    assert statusOtherNonceBefore == statusOtherNonceAfter, "completeWithdrawal changed the status of another nonce unexpectedly";
+}
+
 // Technically covered by initiateWithdrawal_revert, but this is a good property to make explicit.
 rule single_withdrawal_cannot_exceed_amountPerPeriod(uint256 amount, address target) {
     uint256 amountPerPeriod_ = amountPerPeriod();
@@ -191,7 +246,7 @@ rule changeUser(address newUser) {
     assert targetBefore == targetAfter, "changeUser changed some withdrawal target unexpectedly";
     assert unlockTimeBefore == unlockTimeAfter, "changeUser changed some withdrawal unlockTime unexpectedly";
     assert statusBefore == statusAfter, "changeUser changed some withdrawal status unexpectedly";
-    assert lastWithdrawalAtBefore == lastWithdrawalAt(), "changeUser changed lastWithdrawal unexpectedly";
+    assert lastWithdrawalAtBefore == lastWithdrawalAt(), "changeUser changed lastWithdrawalAt unexpectedly";
     assert lastRemainingLimitBefore == lastRemainingLimit(), "changeUser changed lastRemainingLimit unexpectedly";
     assert totalPendingBefore == totalPending(), "changeUser changed totalPending unexpectedly";
 }
@@ -242,7 +297,7 @@ rule renounceAdmin() {
     assert targetBefore == targetAfter, "renounceAdmin changed some withdrawal target unexpectedly";
     assert unlockTimeBefore == unlockTimeAfter, "renounceAdmin changed some withdrawal unlockTime unexpectedly";
     assert statusBefore == statusAfter, "renounceAdmin changed some withdrawal status unexpectedly";
-    assert lastWithdrawalAtBefore == lastWithdrawalAt(), "renounceAdmin changed lastWithdrawal unexpectedly";
+    assert lastWithdrawalAtBefore == lastWithdrawalAt(), "renounceAdmin changed lastWithdrawalAt unexpectedly";
     assert lastRemainingLimitBefore == lastRemainingLimit(), "renounceAdmin changed lastRemainingLimit unexpectedly";
     assert totalPendingBefore == totalPending(), "renounceAdmin changed totalPending unexpectedly";
 }

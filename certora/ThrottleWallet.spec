@@ -23,6 +23,18 @@ rule check_constants() {
     assert timelockDuration() == fourWeeksInSeconds(), "timelockDuration value incorrect";
 }
 
+rule availableToWithdraw() {
+    env e;
+
+    mathint timeDelta = e.block.timestamp - lastWithdrawalAt();
+    mathint unlimitedAccumulatedAmount = timeDelta * amountPerPeriod() / throttlePeriod() + lastRemainingLimit();
+    mathint expectedAccumulatedWithdrawalAmount = unlimitedAccumulatedAmount > to_mathint(amountPerPeriod()) ? amountPerPeriod() : unlimitedAccumulatedAmount;
+
+    mathint accumulatedWithdrawalAmount = availableToWithdraw(e);
+
+    assert accumulatedWithdrawalAmount == expectedAccumulatedWithdrawalAmount, "availableToWithdraw returned the wrong value";
+}
+
 rule changeUser(address newUser) {
     env e;
 

@@ -164,10 +164,7 @@ rule single_withdrawal_cannot_exceed_amountPerPeriod(uint256 amount, address tar
 }
 
 rule completeWithdrawal(uint256 nonce) {
-    env e;
-
     mathint totalPendingBefore = totalPending();
-
     address adminBefore = admin();
     address userBefore  = user();
     uint256 lastWithdrawalAtBefore = lastWithdrawalAt();
@@ -186,6 +183,7 @@ rule completeWithdrawal(uint256 nonce) {
     ThrottleWallet.WithdrawalStatus statusOtherNonceBefore;
     amountOtherNonceBefore, targetOtherNonceBefore, unlockTimeOtherNonceBefore, statusOtherNonceBefore = pendingWithdrawals(otherNonce);
 
+    env e;
     completeWithdrawal(e, nonce);
 
     uint256 amountNonceAfter;
@@ -196,12 +194,12 @@ rule completeWithdrawal(uint256 nonce) {
 
     // checks for modified values
     assert to_mathint(totalPending()) == totalPendingBefore - amountNonceBefore, "completeWithdrawal did not update totalPending as expected";
-    assert unlockTimeNonceAfter == unlockTimeNonceBefore, "completeWithdrawal changed the withdrawal unlock time unexpectedly";
+    assert statusNonceAfter == ThrottleWallet.WithdrawalStatus.Completed, "completeWithdrawal did not set the withdrawal status correctly";
 
     // checks for preserved values
     assert amountNonceAfter == amountNonceBefore, "completeWithdrawal changed the withdrawal amount unexpectedly";
     assert targetNonceAfter == targetNonceBefore, "completeWithdrawal changed the withdrawal target unexpectedly";
-    assert statusNonceAfter == ThrottleWallet.WithdrawalStatus.Completed, "completeWithdrawal did not set the withdrawal status correctly";
+    assert unlockTimeNonceAfter == unlockTimeNonceBefore, "completeWithdrawal changed the withdrawal unlock time unexpectedly";
     assert admin() == adminBefore, "completeWithdrawal changed admin unexpectedly";
     assert user()  == userBefore, "completeWithdrawal changed user unexpectedly";
     assert lastWithdrawalAt() == lastWithdrawalAtBefore , "completeWithdrawal changed lastWithdrawalAt unexpectedly";
@@ -248,6 +246,59 @@ rule completeWithdrawal_revert(uint256 nonce) {
     assert revert7 => lastReverted, "revert7  failed";
     assert lastReverted => revert1 || revert2  || revert3   || revert4 ||
                            revert5 || revert6  || revert7, "not all reversion cases are covered";
+}
+
+rule cancelWithdrawal(uint256 nonce) {
+    mathint totalPendingBefore = totalPending();
+    address adminBefore = admin();
+    address userBefore  = user();
+    uint256 lastWithdrawalAtBefore = lastWithdrawalAt();
+    uint256 lastRemainingLimitBefore = lastRemainingLimit();
+    uint256 nextNonceBefore = nextNonce();
+    uint256 amountNonceBefore;
+    address targetNonceBefore;
+    uint256 unlockTimeNonceBefore;
+    ThrottleWallet.WithdrawalStatus statusNonceBefore;  // unused
+    amountNonceBefore, targetNonceBefore, unlockTimeNonceBefore, statusNonceBefore = pendingWithdrawals(nonce);
+    uint256 otherNonce;
+    require otherNonce != nonce;
+    uint256 amountOtherNonceBefore;
+    address targetOtherNonceBefore;
+    uint256 unlockTimeOtherNonceBefore;
+    ThrottleWallet.WithdrawalStatus statusOtherNonceBefore;
+    amountOtherNonceBefore, targetOtherNonceBefore, unlockTimeOtherNonceBefore, statusOtherNonceBefore = pendingWithdrawals(otherNonce);
+
+    env e;
+    cancelWithdrawal(e, nonce);
+
+    uint256 amountNonceAfter;
+    address targetNonceAfter;
+    uint256 unlockTimeNonceAfter;
+    ThrottleWallet.WithdrawalStatus statusNonceAfter;
+    amountNonceAfter, targetNonceAfter, unlockTimeNonceAfter, statusNonceAfter = pendingWithdrawals(nonce);
+
+    // checks for modified values
+    assert to_mathint(totalPending()) == totalPendingBefore - amountNonceBefore, "cancelWithdrawal did not update totalPending as expected";
+    assert statusNonceAfter == ThrottleWallet.WithdrawalStatus.Cancelled, "cancelWithdrawal did not update withdrawal status as expected";
+
+    // checks for preserved values
+    assert amountNonceAfter == amountNonceBefore, "cancelWithdrawal changed the withdrawal amount unexpectedly";
+    assert targetNonceAfter == targetNonceBefore, "cancelWithdrawal changed the withdrawal target unexpectedly";
+    assert unlockTimeNonceAfter == unlockTimeNonceBefore, "cancelWithdrawal changed the withdrawal unlock time unexpectedly";
+    assert admin() == adminBefore, "cancelWithdrawal changed admin unexpectedly";
+    assert user()  == userBefore, "cancelWithdrawal changed user unexpectedly";
+    assert lastWithdrawalAt() == lastWithdrawalAtBefore , "cancelWithdrawal changed lastWithdrawalAt unexpectedly";
+    assert lastRemainingLimit() == lastRemainingLimitBefore , "cancelWithdrawal changed lastRemainingLimit unexpectedly";
+    assert nextNonce() == nextNonceBefore, "cancelWithdrawal changed nextNonce expectedly";
+    uint256 amountOtherNonceAfter;
+    address targetOtherNonceAfter;
+    uint256 unlockTimeOtherNonceAfter;
+    ThrottleWallet.WithdrawalStatus statusOtherNonceAfter;
+    amountOtherNonceAfter, targetOtherNonceAfter, unlockTimeOtherNonceAfter, statusOtherNonceAfter = pendingWithdrawals(otherNonce);
+    assert amountOtherNonceBefore == amountOtherNonceAfter, "cancelWithdrawal changed the amount of another nonce unexpectedly";
+    assert targetOtherNonceBefore == targetOtherNonceAfter, "cancelWithdrawal changed the target of another nonce unexpectedly";
+    assert unlockTimeOtherNonceBefore == unlockTimeOtherNonceAfter, "cancelWithdrawal changed the unlockTime of another nonce unexpectedly";
+    assert statusOtherNonceBefore == statusOtherNonceAfter, "cancelWithdrawal changed the status of another nonce unexpectedly";
 }
 
 rule changeUser(address newUser) {

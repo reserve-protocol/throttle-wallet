@@ -7,6 +7,7 @@ certora: FORCE
 		--solc_evm_version paris \
 		--rule_sanity basic \
 		src/ThrottleWallet.sol \
+		certora/TokenMock.sol \
 		--packages "@openzeppelin=lib/openzeppelin-contracts/contracts" \
 		--verify ThrottleWallet:certora/ThrottleWallet.spec \
 		$(if $(rule),--rule $(rule),)

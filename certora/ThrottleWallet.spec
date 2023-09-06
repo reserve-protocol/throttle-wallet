@@ -1,3 +1,5 @@
+using TokenMock as token;
+
 methods {
     function throttledToken() external returns (address) envfree;
     function throttlePeriod() external returns (uint256) envfree;
@@ -10,6 +12,7 @@ methods {
     function totalPending() external returns (uint256) envfree;
     function admin() external returns (address) envfree;
     function user()  external returns (address) envfree;
+    function token.balanceOf(address) external returns (uint256) envfree;
 }
 
 definition fourWeeksInSeconds() returns uint256 = 4 * 7 * 24 * 60 * 60;
@@ -53,6 +56,58 @@ rule availableToWithdraw_revert() {
     assert revert3 => lastReverted, "revert3 failed";
     assert revert4 => lastReverted, "revert4 falied";
     assert lastReverted => revert1 || revert2 || revert3 || revert4, "not all reversion cases are covered";
+}
+
+rule initiateWithdrawal(uint256 amount, address target) {
+    require throttledToken() == token;
+
+    env e;
+
+    mathint nextNonceBefore = nextNonce();
+    mathint totalPendingBefore = totalPending();
+    mathint accumulatedWithdrawalAmountBefore = availableToWithdraw(e);
+
+    address adminBefore = admin();
+    address userBefore  = user();
+    uint256 otherNonce;
+    require otherNonce != assert_uint256(nextNonceBefore);
+    uint256 amountOtherNonceBefore;
+    address targetOtherNonceBefore;
+    uint256 unlockTimeOtherNonceBefore;
+    ThrottleWallet.WithdrawalStatus statusOtherNonceBefore;
+    amountOtherNonceBefore, targetOtherNonceBefore, unlockTimeOtherNonceBefore, statusOtherNonceBefore = pendingWithdrawals(otherNonce);
+
+    initiateWithdrawal(e, amount, target);
+
+    mathint accumulatedWithdrawalAmountAfter = availableToWithdraw(e);
+
+    assert lastWithdrawalAt() == e.block.timestamp, "initiateWithdrawal did not update lastWithdrawalAt as expected";
+    assert to_mathint(nextNonce()) == nextNonceBefore + 1, "initiateWithdrawal did not update nextNonce as expected";
+    assert to_mathint(totalPending()) == totalPendingBefore + amount, "initiateWithdrawal did not update totalPending as expected";
+    assert to_mathint(lastRemainingLimit()) == accumulatedWithdrawalAmountBefore - amount, "initiateWithdrawal did not update lastRemainingLimit as expected";
+    assert accumulatedWithdrawalAmountAfter == accumulatedWithdrawalAmountBefore - amount, "accumulatedWithdrawalAmount() return value did not decrease as expected after initiateWithdrawal";
+    uint256 amountNonceAfter;
+    address targetNonceAfter;
+    uint256 unlockTimeNonceAfter;
+    ThrottleWallet.WithdrawalStatus statusNonceAfter;
+    amountNonceAfter, targetNonceAfter, unlockTimeNonceAfter, statusNonceAfter = pendingWithdrawals(assert_uint256(nextNonceBefore));
+    assert amountNonceAfter == amount, "initiateWithdrawal did not set the withdrawal amount correctly";
+    assert targetNonceAfter == target, "initiateWithdrawal did not set the withdrawal target correctly";
+    assert unlockTimeNonceAfter == assert_uint256(e.block.timestamp + timelockDuration()), "initiateWithdrawal did not set the withdrawal unlock time correctly";
+    assert statusNonceAfter == ThrottleWallet.WithdrawalStatus.Pending, "initiateWithdrawal did not set the withdrawal status correctly";
+
+    // checks for preserved values
+    assert admin() == adminBefore, "initiateWithdrawal changed admin unexpectedly";
+    assert user()  == userBefore, "initiateWithdrawal changed user unexpectedly";
+    uint256 amountOtherNonceAfter;
+    address targetOtherNonceAfter;
+    uint256 unlockTimeOtherNonceAfter;
+    ThrottleWallet.WithdrawalStatus statusOtherNonceAfter;
+    amountOtherNonceAfter, targetOtherNonceAfter, unlockTimeOtherNonceAfter, statusOtherNonceAfter = pendingWithdrawals(otherNonce);
+    assert amountOtherNonceBefore == amountOtherNonceAfter, "initiateWithdrawal changed the amount of another nonce unexpectedly";
+    assert targetOtherNonceBefore == targetOtherNonceAfter, "initiateWithdrawal changed the target of another nonce unexpectedly";
+    assert unlockTimeOtherNonceBefore == unlockTimeOtherNonceAfter, "initiateWithdrawal changed the unlockTime of another nonce unexpectedly";
+    assert statusOtherNonceBefore == statusOtherNonceAfter, "initiateWithdrawal changed the status of another nonce unexpectedly";
 }
 
 rule changeUser(address newUser) {
@@ -163,7 +218,7 @@ rule renouncing_ownership_is_final_and_makes_user_immutable(method f) {
     env e;
     calldataarg args;
 
-    require admin() == 0;  // using this as definition of "ownership renounced"
+    require admin() == 0;  // using this as definition of "ownership renounced"; covered by renounceAdmin rule
     require e.msg.sender != 0;  // exclude the 0 address as a valid sender
     address userBefore = user();
 

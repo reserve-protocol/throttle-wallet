@@ -14,6 +14,7 @@ methods {
     function user()  external returns (address) envfree;
     function token.balanceOf(address) external returns (uint256) envfree;
     function _.balanceOf(address) external => DISPATCHER(true);
+    function _.transfer(address, uint256) external => DISPATCHER(true);
 }
 
 definition fourWeeksInSeconds() returns uint256 = 4 * 7 * 24 * 60 * 60;
@@ -215,6 +216,38 @@ rule completeWithdrawal(uint256 nonce) {
     assert targetOtherNonceBefore == targetOtherNonceAfter, "completeWithdrawal changed the target of another nonce unexpectedly";
     assert unlockTimeOtherNonceBefore == unlockTimeOtherNonceAfter, "completeWithdrawal changed the unlockTime of another nonce unexpectedly";
     assert statusOtherNonceBefore == statusOtherNonceAfter, "completeWithdrawal changed the status of another nonce unexpectedly";
+}
+
+rule completeWithdrawal_revert(uint256 nonce) {
+    require throttledToken() == token;
+    uint256 tokenBalance = token.balanceOf(currentContract);
+    uint256 nextNonce_ = nextNonce();
+    uint256 totalPending_ = totalPending();
+    uint256 amount;
+    address target;
+    uint256 unlockTime;
+    ThrottleWallet.WithdrawalStatus status;
+    amount, target, unlockTime, status = pendingWithdrawals(nonce);
+
+    env e;
+    completeWithdrawal@withrevert(e, nonce);
+
+    bool revert1 = e.msg.value > 0;
+    bool revert2 = nonce >= nextNonce_;
+    bool revert3 = amount == 0;
+    bool revert4 = unlockTime > e.block.timestamp;
+    bool revert5 = status != ThrottleWallet.WithdrawalStatus.Pending;
+    bool revert6 = totalPending_ < amount;
+    bool revert7 = tokenBalance < amount;
+    assert revert1 => lastReverted, "revert1  failed";
+    assert revert2 => lastReverted, "revert2  failed";
+    assert revert3 => lastReverted, "revert3  failed";
+    assert revert4 => lastReverted, "revert4  failed";
+    assert revert5 => lastReverted, "revert5  failed";
+    assert revert6 => lastReverted, "revert6  failed";
+    assert revert7 => lastReverted, "revert7  failed";
+    assert lastReverted => revert1 || revert2  || revert3   || revert4 ||
+                           revert5 || revert6  || revert7, "not all reversion cases are covered";
 }
 
 rule changeUser(address newUser) {

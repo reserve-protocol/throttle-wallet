@@ -13,6 +13,7 @@ methods {
     function admin() external returns (address) envfree;
     function user()  external returns (address) envfree;
     function token.balanceOf(address) external returns (uint256) envfree;
+    function _.balanceOf(address) external => DISPATCHER(true);
 }
 
 definition fourWeeksInSeconds() returns uint256 = 4 * 7 * 24 * 60 * 60;
@@ -108,6 +109,51 @@ rule initiateWithdrawal(uint256 amount, address target) {
     assert targetOtherNonceBefore == targetOtherNonceAfter, "initiateWithdrawal changed the target of another nonce unexpectedly";
     assert unlockTimeOtherNonceBefore == unlockTimeOtherNonceAfter, "initiateWithdrawal changed the unlockTime of another nonce unexpectedly";
     assert statusOtherNonceBefore == statusOtherNonceAfter, "initiateWithdrawal changed the status of another nonce unexpectedly";
+}
+
+rule initiateWithdrawal_revert(uint256 amount, address target) {
+    require throttledToken() == token;
+
+    address user_ = user();
+    mathint tokenBalance = token.balanceOf(currentContract);
+    mathint totalPending_ = totalPending();
+    mathint nonce = nextNonce();
+    mathint timelockDuration_ = timelockDuration();
+
+    env e;
+
+    mathint timeSinceLastWithdrawal = e.block.timestamp - lastWithdrawalAt();
+    mathint product = timeSinceLastWithdrawal * amountPerPeriod();
+    mathint unlimitedAccumulatedWithdrawalAmount = product / throttlePeriod() + lastRemainingLimit();
+    mathint accumulatedWithdrawalAmount = unlimitedAccumulatedWithdrawalAmount > to_mathint(amountPerPeriod()) ? amountPerPeriod() : unlimitedAccumulatedWithdrawalAmount;
+
+    initiateWithdrawal@withrevert(e, amount, target);
+
+    bool revert1  = e.msg.value  != 0;
+    bool revert2  = e.msg.sender != user_;
+    bool revert3  = amount == 0;
+    bool revert4  = totalPending_ + amount > max_uint256;
+    bool revert5  = tokenBalance < totalPending_ + amount;
+    bool revert6  = timeSinceLastWithdrawal < 0;
+    bool revert7  = product > max_uint256;
+    bool revert8  = unlimitedAccumulatedWithdrawalAmount > max_uint256;
+    bool revert9  = accumulatedWithdrawalAmount < to_mathint(amount);
+    bool revert10 = nonce == max_uint256;
+    bool revert11 = e.block.timestamp + timelockDuration_ > max_uint256;
+    assert revert1  => lastReverted, "revert1  failed";
+    assert revert2  => lastReverted, "revert2  failed";
+    assert revert3  => lastReverted, "revert3  failed";
+    assert revert4  => lastReverted, "revert4  failed";
+    assert revert5  => lastReverted, "revert5  failed";
+    assert revert6  => lastReverted, "revert6  failed";
+    assert revert7  => lastReverted, "revert7  failed";
+    assert revert8  => lastReverted, "revert8  failed";
+    assert revert9  => lastReverted, "revert9  failed";
+    assert revert10 => lastReverted, "revert10 failed";
+    assert revert11 => lastReverted, "revert11 failed";
+    assert lastReverted => revert1 || revert2  || revert3   || revert4 ||
+                           revert5 || revert6  || revert7   || revert8 ||
+                           revert9 || revert10 || revert11, "not all reversion cases are covered";
 }
 
 rule changeUser(address newUser) {

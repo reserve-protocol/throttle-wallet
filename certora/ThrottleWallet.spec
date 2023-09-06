@@ -1,4 +1,8 @@
 methods {
+    function throttledToken() external returns (address) envfree;
+    function throttlePeriod() external returns (uint256) envfree;
+    function amountPerPeriod() external returns (uint256) envfree;
+    function timelockDuration() external returns (uint256) envfree;
     function nextNonce() external returns (uint256) envfree;
     function pendingWithdrawals(uint256) external returns (uint256, address, uint256, ThrottleWallet.WithdrawalStatus) envfree;
     function lastWithdrawalAt() external returns (uint256) envfree;
@@ -8,7 +12,16 @@ methods {
     function user()  external returns (address) envfree;
 }
 
+definition fourWeeksInSeconds() returns uint256 = 4 * 7 * 24 * 60 * 60;
+
 // --- function-specific rules ---
+
+rule check_constants() {
+    assert throttledToken() == 0x320623b8E4fF03373931769A31Fc52A4E78B5d70, "throttledToken value incorrect";
+    assert throttlePeriod() == fourWeeksInSeconds(), "throttlePeriod value incorrect";
+    assert amountPerPeriod() == 10^27, "amountPerPeriod value incorrect";
+    assert timelockDuration() == fourWeeksInSeconds(), "timelockDuration value incorrect";
+}
 
 rule changeUser(address newUser) {
     env e;
@@ -113,14 +126,12 @@ rule renounceAdmin_revert() {
 // --- multi-function properties ---
 
 // Note: this fails when sanity checking rules is enabled because some functions
-// simply revert when admin is the zero address (and the fallback function reverts always).
-rule renouncing_ownership_is_final_and_makes_user_immutable(method f) filtered {
-    f -> !f.isFallback
-} {
+// simply revert when admin is the zero address.
+rule renouncing_ownership_is_final_and_makes_user_immutable(method f) {
     env e;
     calldataarg args;
 
-    require admin() == 0;  // using this as definition of "ownership renounced"
+    require admin() == 0;  // using this as definition of "ownership renounced"; coverd by renounceAdmin rule
     require e.msg.sender != 0;  // exclude the 0 address as a valid sender
     address userBefore = user();
 

@@ -27,11 +27,11 @@ ghost mapping(uint256 => uint256) amountGhost {
     init_state axiom forall uint256 nonce. amountGhost[nonce] == 0;
 }
 
-hook Sload uint256 v currentContract.pendingWithdrawals[KEY uint256 nonce].(offset 0) STORAGE {
+hook Sload uint256 v currentContract.pendingWithdrawals[KEY uint256 nonce].amount STORAGE {
     require amountGhost[nonce] == v;
 }
 
-hook Sstore currentContract.pendingWithdrawals[KEY uint256 nonce].(offset 0) uint256 newAmount (uint256 oldAmount) STORAGE {
+hook Sstore currentContract.pendingWithdrawals[KEY uint256 nonce].amount uint256 newAmount (uint256 oldAmount) STORAGE {
     // We know each amount is only written once since nextNonce is increased when an amount is written, so we do not need to subtract oldAmount.
     havoc sumOfPendingAmountsGhost assuming sumOfPendingAmountsGhost@new() == sumOfPendingAmountsGhost@old() + newAmount;
     amountGhost[nonce] = newAmount;
@@ -209,6 +209,8 @@ rule single_withdrawal_cannot_exceed_amountPerPeriod(uint256 amount, address tar
 }
 
 rule completeWithdrawal(uint256 nonce) {
+    require throttledToken() == token;
+    uint256 balanceOfBefore = token.balanceOf(currentContract);
     mathint totalPendingBefore = totalPending();
     address adminBefore = admin();
     address userBefore  = user();
@@ -240,6 +242,8 @@ rule completeWithdrawal(uint256 nonce) {
     // checks for modified values
     assert to_mathint(totalPending()) == totalPendingBefore - amountNonceBefore, "completeWithdrawal did not update totalPending as expected";
     assert statusNonceAfter == ThrottleWallet.WithdrawalStatus.Completed, "completeWithdrawal did not set the withdrawal status correctly";
+    assert targetNonceBefore != currentContract => token.balanceOf(currentContract) == assert_uint256(balanceOfBefore - amountNonceBefore);
+    assert targetNonceBefore == currentContract => token.balanceOf(currentContract) == balanceOfBefore;
 
     // checks for preserved values
     assert amountNonceAfter == amountNonceBefore, "completeWithdrawal changed the withdrawal amount unexpectedly";

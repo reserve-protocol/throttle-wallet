@@ -19,6 +19,51 @@ methods {
 
 definition fourWeeksInSeconds() returns uint256 = 4 * 7 * 24 * 60 * 60;
 
+ghost sumOfPendingAmountsGhost() returns mathint {
+    init_state axiom sumOfPendingAmountsGhost() == 0;
+}
+
+ghost mapping(uint256 => uint256) amountGhost {
+    init_state axiom forall uint256 nonce. amountGhost[nonce] == 0;
+}
+
+hook Sload uint256 v currentContract.pendingWithdrawals[KEY uint256 nonce].(offset 0) STORAGE {
+    require amountGhost[nonce] == v;
+}
+
+hook Sstore currentContract.pendingWithdrawals[KEY uint256 nonce].(offset 0) uint256 newAmount (uint256 oldAmount) STORAGE {
+    // We know each amount is only written once since nextNonce is increased when an amount is written, so we do not need to subtract oldAmount.
+    havoc sumOfPendingAmountsGhost assuming sumOfPendingAmountsGhost@new() == sumOfPendingAmountsGhost@old() + newAmount;
+    amountGhost[nonce] = newAmount;
+}
+
+ghost mapping(uint256 => ThrottleWallet.WithdrawalStatus) statusGhost {
+    // Pending is the first enum entry and thus the same as zero, the EVM default value.
+    init_state axiom forall uint256 nonce. statusGhost[nonce] == ThrottleWallet.WithdrawalStatus.Pending;
+}
+
+hook Sload ThrottleWallet.WithdrawalStatus v currentContract.pendingWithdrawals[KEY uint256 nonce].status STORAGE {
+    require statusGhost[nonce] == v;
+}
+
+hook Sstore currentContract.pendingWithdrawals[KEY uint256 nonce].status ThrottleWallet.WithdrawalStatus newStatus (ThrottleWallet.WithdrawalStatus oldStatus) STORAGE {
+    havoc sumOfPendingAmountsGhost assuming 
+        (
+            (
+                newStatus == ThrottleWallet.WithdrawalStatus.Completed ||
+                newStatus == ThrottleWallet.WithdrawalStatus.Cancelled
+            ) => sumOfPendingAmountsGhost@new() == sumOfPendingAmountsGhost@old() - amountGhost[nonce]
+        )
+        &&
+        (
+            !(
+                newStatus == ThrottleWallet.WithdrawalStatus.Completed ||
+                newStatus == ThrottleWallet.WithdrawalStatus.Cancelled
+            ) => sumOfPendingAmountsGhost@new() == sumOfPendingAmountsGhost@old()
+        );
+    statusGhost[nonce] = newStatus;
+}
+
 // --- function-specific rules ---
 
 rule check_constants() {
@@ -445,5 +490,16 @@ rule renouncing_ownership_is_final_and_makes_user_immutable(method f) {
     assert user() == userBefore, "user changed after admin renounced";
 }
 
+rule nextNonce_stays_constant_or_increases_by_one(method f) {
+    uint256 nextNonceBefore = nextNonce();
+    env e;
+    calldataarg args;
+    f(e, args);
+    assert nextNonce() == nextNonceBefore || nextNonce() == assert_uint256(nextNonceBefore + 1);
+}
+
 invariant lastRemainingLimit_bounded_by_amountPerPeriod()
     lastRemainingLimit() < amountPerPeriod();
+
+invariant totalPending_equals_sum_of_pending_amounts()
+    to_mathint(totalPending()) == sumOfPendingAmountsGhost();

@@ -45,8 +45,14 @@ contract ThrottleWalletTest is Test {
     function test_Withdraw() public {
         vm.startPrank(user_user);
 
-        vm.expectRevert();
+        vm.expectRevert("amount must be greater than 0");
+        throttleWallet.initiateWithdrawal(0, user_target);
+
+        vm.expectRevert("target cannot be 0x0");
         throttleWallet.initiateWithdrawal(1_000 ether, address(0));
+
+        vm.expectRevert("insufficient funds");
+        throttleWallet.initiateWithdrawal(3_000_000_000 ether, user_target);
 
         vm.expectEmit();
         emit WithdrawalInitiated(0, user_target, 1_000 ether, block.timestamp + 4 weeks);
@@ -55,6 +61,24 @@ contract ThrottleWalletTest is Test {
         assertEq(token.balanceOf(address(throttleWallet)), 2_000_000_000 ether);
         assertEq(token.balanceOf(address(this)), 0);
         assertEq(throttleWallet.totalPending(), 1_000 ether);
+        vm.stopPrank();
+    }
+
+    function test_completeWithdraw() public {
+        vm.startPrank(user_user);
+
+        throttleWallet.initiateWithdrawal(1_000 ether, user_target);
+
+        vm.warp(START_TIME + 4 weeks);
+        throttleWallet.completeWithdrawal(0);
+
+        vm.stopPrank();
+
+        vm.startPrank(user_admin);
+        
+        vm.expectRevert("withdrawal is not pending");
+        throttleWallet.cancelWithdrawal(0);
+
         vm.stopPrank();
     }
 

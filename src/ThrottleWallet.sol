@@ -84,6 +84,11 @@ contract ThrottleWallet {
             accumulatedWithdrawalAmount = amountPerPeriod;
         }
 
+        uint256 bal = throttledToken.balanceOf(address(this));
+        if (accumulatedWithdrawalAmount > bal) {
+            accumulatedWithdrawalAmount = bal;
+        }
+
         return accumulatedWithdrawalAmount;
     }
 

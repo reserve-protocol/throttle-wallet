@@ -183,7 +183,7 @@ contract ThrottleWalletTest is Test {
         throttleWallet.completeWithdrawal(1);
 
         // The throttle is now full charged
-        assertEq(throttleWallet.availableToWithdraw(), 1_000_000_000 ether);
+        assertEq(throttleWallet.availableToWithdraw(), 500_000_000 ether);
         vm.stopPrank();
     }
 
@@ -219,5 +219,20 @@ contract ThrottleWalletTest is Test {
         throttleWallet.renounceAdmin();
         vm.expectRevert();
         throttleWallet.changeUser(address(6));
+    }
+
+    function test_availableToWithdrawBalance() public {
+        vm.startPrank(user_user);
+
+        // Drain the entire throttle!
+        throttleWallet.initiateWithdrawal(1_000_000_000 ether, user_target);
+        vm.warp(START_TIME + 4 weeks);
+        throttleWallet.completeWithdrawal(0);
+
+        throttleWallet.initiateWithdrawal(500_000_000 ether, user_target);
+        vm.warp(START_TIME + 8 weeks);
+        throttleWallet.completeWithdrawal(1);
+
+        assertEq(throttleWallet.availableToWithdraw(), 500_000_000 ether);
     }
 }

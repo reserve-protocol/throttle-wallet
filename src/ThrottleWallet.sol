@@ -99,6 +99,7 @@ contract ThrottleWallet {
      */
     function initiateWithdrawal(uint256 amount, address target) external onlyUser returns (uint256) {
         require(amount != 0, "amount must be greater than 0");
+        require(target != address(0), "target cannot be 0x0");
         require(throttledToken.balanceOf(address(this)) >= totalPending + amount, "insufficient funds");
 
         uint256 accumulatedWithdrawalAmount = availableToWithdraw();

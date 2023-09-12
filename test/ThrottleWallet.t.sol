@@ -44,8 +44,11 @@ contract ThrottleWalletTest is Test {
 
     function test_Withdraw() public {
         vm.startPrank(user_user);
-        vm.expectEmit();
 
+        vm.expectRevert();
+        throttleWallet.initiateWithdrawal(1_000 ether, address(0));
+
+        vm.expectEmit();
         emit WithdrawalInitiated(0, user_target, 1_000 ether, block.timestamp + 4 weeks);
         throttleWallet.initiateWithdrawal(1_000 ether, user_target);
 

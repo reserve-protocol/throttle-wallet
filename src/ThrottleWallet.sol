@@ -8,7 +8,7 @@ contract ThrottleWallet {
     using SafeERC20 for IERC20;
 
     /**
-     * @notice Structs
+     * @notice Withdrawal Statuses
      */
     enum WithdrawalStatus {
         Pending,
@@ -16,6 +16,13 @@ contract ThrottleWallet {
         Cancelled
     }
 
+    /**
+     * @notice Withdrawal Request struct
+     * @param amount The amount of tokens to be withdrawn
+     * @param target The address of the recipient
+     * @param unlockTime The time at which the withdrawal can be completed
+     * @param status The status of the withdrawal
+     */
     struct WithdrawalRequest {
         uint256 amount;
         address target;
@@ -26,10 +33,40 @@ contract ThrottleWallet {
     /**
      * @notice Events
      */
+
+    /**
+     * @notice Emitted when a withdrawal is initiated.
+     * @param nonce The nonce of the withdrawal
+     * @param to The address of the recipient
+     * @param amount The amount of tokens to be withdrawn
+     * @param unlockTime The time at which the withdrawal can be completed
+     */
     event WithdrawalInitiated(uint256 indexed nonce, address indexed to, uint256 amount, uint256 unlockTime);
+
+    /**
+     * @notice Emitted when a withdrawal is completed.
+     * @param nonce The nonce of the withdrawal
+     */
     event WithdrawalCompleted(uint256 indexed nonce);
+
+    /**
+     * @notice Emitted when a withdrawal is cancelled.
+     * @param nonce The nonce of the withdrawal
+     */
     event WithdrawalCancelled(uint256 indexed nonce);
+
+    /**
+     * @notice Emitted when the user role is changed.
+     * @param previousUser The address of the previous user
+     * @param newUser The address of the new user
+     */
     event UserChanged(address indexed previousUser, address indexed newUser);
+
+    /**
+     * @notice Emitted when the admin role is changed.
+     * @param previousAdmin The address of the previous admin
+     * @param newAdmin The address of the new admin
+     */
     event AdminChanged(address indexed previousAdmin, address indexed newAdmin);
 
     /**
@@ -44,14 +81,40 @@ contract ThrottleWallet {
     /**
      * @notice State
      */
+
+    /**
+     * @notice Withdrawal nonce
+     */
     uint256 public nextNonce;
+
+    /**
+     * @notice Nonce to withdrawal request mapping
+     */
     mapping(uint256 nonce => WithdrawalRequest request) public pendingWithdrawals;
 
+    /**
+     * @notice Last withdrawal timestamp {s}
+     */
     uint256 public lastWithdrawalAt;
+
+    /**
+     * @notice Last remaining limit {s}
+     */
     uint256 public lastRemainingLimit;
+
+    /**
+     * @notice Total pending withdrawals {qRSR}
+     */
     uint256 public totalPending;
 
+    /**
+     * @notice Admin address
+     */
     address public admin;
+
+    /**
+     * @notice User address
+     */
     address public user;
 
     modifier onlyAdmin() {
@@ -74,6 +137,7 @@ contract ThrottleWallet {
 
     /**
      * @notice Helper function to calculate the maximum amount available to withdraw (subject to timelock)
+     * @return accumulatedWithdrawalAmount The maximum amount available to withdraw
      */
     function availableToWithdraw() public view returns (uint256) {
         uint256 timeSinceLastWithdrawal = block.timestamp - lastWithdrawalAt;
@@ -96,6 +160,9 @@ contract ThrottleWallet {
      * @notice Initiate Withdrawal with a specific amount and target.
      *         The amount is immediately blocked but can only be withdrawn
      *         after the timelock period has passed.
+     * @param amount The amount of tokens to be withdrawn
+     * @param target The address of the recipient
+     * @return nonce The nonce of the withdrawal
      */
     function initiateWithdrawal(uint256 amount, address target) external onlyUser returns (uint256) {
         require(amount != 0, "amount must be greater than 0");
@@ -127,6 +194,7 @@ contract ThrottleWallet {
      * @notice Allows completing a withdrawal after the timelock period has passed.
      *         Completing a withdrawal is permissionless.
      * @dev Does not impact the throttle.
+     * @param _nonce The nonce of the withdrawal
      */
     function completeWithdrawal(uint256 _nonce) external {
         require(_nonce < nextNonce, "invalid nonce");
@@ -149,6 +217,7 @@ contract ThrottleWallet {
      * @notice Allows cancelling a withdrawal if it has not been completed already.
      *         Only the admin can cancel a withdrawal.
      * @dev The throttle is NOT recharged on cancellation.
+     * @param _nonce The nonce of the withdrawal
      */
     function cancelWithdrawal(uint256 _nonce) external onlyAdmin {
         require(_nonce < nextNonce, "invalid nonce");
@@ -164,8 +233,9 @@ contract ThrottleWallet {
     }
 
     /**
-     * @notice Access Control
-     * @dev Admin role can NOT be changed (only renounced), admin can change user role.
+     * @notice Access Control: onlyAdmin
+     * @dev Admin can change user role.
+     * @param _newUser New user address
      */
     function changeUser(address _newUser) external onlyAdmin {
         require(_newUser != user, "new user can not be the same");
@@ -174,6 +244,10 @@ contract ThrottleWallet {
         user = _newUser;
     }
 
+    /**
+     * @notice Access Control: onlyAdmin
+     * @dev Admin role can NOT be changed (only renounced).
+     */
     function renounceAdmin() external onlyAdmin {
         emit AdminChanged(admin, address(0));
 

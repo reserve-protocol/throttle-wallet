@@ -133,6 +133,9 @@ contract ThrottleWallet {
 
         admin = _admin;
         user = _user;
+
+        emit AdminChanged(address(0), _admin);
+        emit UserChanged(address(0), _user);
     }
 
     /**

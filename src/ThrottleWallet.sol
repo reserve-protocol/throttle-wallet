@@ -256,4 +256,22 @@ contract ThrottleWallet {
 
         admin = address(0);
     }
+
+    /**
+     * @notice Rescue funds from contract
+     * @notice Cannon rescue the throttled token
+     * @notice Pass 0x0 as _token to rescue ETH
+     * @param _token The address of the token to be rescued
+     */
+    function rescueFunds(address _token) external {
+        require(_token != address(throttledToken), "cannot rescue throttled token");
+
+        address recipient = admin == address(0) ? user : admin;
+
+        if (_token == address(0)) {
+            payable(recipient).transfer(address(this).balance);
+        } else {
+            IERC20(_token).safeTransfer(recipient, IERC20(_token).balanceOf(address(this)));
+        }
+    }
 }

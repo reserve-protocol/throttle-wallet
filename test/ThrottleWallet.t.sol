@@ -262,4 +262,28 @@ contract ThrottleWalletTest is Test {
 
         assertEq(throttleWallet.availableToWithdraw(), 500_000_000 ether);
     }
+
+    function test_rescueFunds() public {
+        MintableERC20 lostToken = new MintableERC20("LOST", "LOST");
+        lostToken.mint(address(throttleWallet), 1_000_000_000 ether);
+
+        vm.expectRevert("cannot rescue throttled token");
+        throttleWallet.rescueFunds(address(token));
+
+        throttleWallet.rescueFunds(address(lostToken));
+
+        assertEq(lostToken.balanceOf(address(user_admin)), 1_000_000_000 ether);
+        assertEq(lostToken.balanceOf(address(throttleWallet)), 0);
+
+        vm.startPrank(user_admin);
+        throttleWallet.renounceAdmin();
+
+        deal(address(throttleWallet), 10 ether);
+
+        throttleWallet.rescueFunds(address(0));
+
+        assertEq(user_user.balance, 10 ether);
+        assertEq(address(throttleWallet).balance, 0);
+        vm.stopPrank();
+    }
 }

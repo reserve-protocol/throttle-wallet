@@ -8,6 +8,10 @@ contract ThrottleWallet {
     using SafeERC20 for IERC20;
 
     /**
+     * @notice Data Structures
+     */
+
+    /**
      * @notice Withdrawal Statuses
      */
     enum WithdrawalStatus {
@@ -144,16 +148,16 @@ contract ThrottleWallet {
      */
     function availableToWithdraw() public view returns (uint256) {
         uint256 timeSinceLastWithdrawal = block.timestamp - lastWithdrawalAt;
-        uint256 accumulatedWithdrawalAmount =
-            ((timeSinceLastWithdrawal * amountPerPeriod) / throttlePeriod) + lastRemainingLimit;
+        uint256 accumulatedWithdrawalAmount = ((timeSinceLastWithdrawal * amountPerPeriod) / throttlePeriod) +
+            lastRemainingLimit;
 
         if (accumulatedWithdrawalAmount > amountPerPeriod) {
             accumulatedWithdrawalAmount = amountPerPeriod;
         }
 
-        uint256 bal = throttledToken.balanceOf(address(this));
-        if (accumulatedWithdrawalAmount > bal) {
-            accumulatedWithdrawalAmount = bal;
+        uint256 availableBalance = throttledToken.balanceOf(address(this));
+        if (accumulatedWithdrawalAmount > availableBalance) {
+            accumulatedWithdrawalAmount = availableBalance;
         }
 
         return accumulatedWithdrawalAmount;
@@ -259,8 +263,8 @@ contract ThrottleWallet {
 
     /**
      * @notice Rescue funds from contract
-     * @notice Cannon rescue the throttled token
-     * @notice Pass 0x0 as _token to rescue ETH
+     * @dev Disallows rescuing throttled token, pass 0x0 as _token to rescue ETH.
+     *      Intentionally uses `transfer` instead of `call` for ETH
      * @param _token The address of the token to be rescued
      */
     function rescueFunds(address _token) external {

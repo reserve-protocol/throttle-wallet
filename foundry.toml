@@ -1,16 +1,16 @@
 [profile.default]
-src = "src"
-out = "out"
+evm_version = "paris"
+fs_permissions = [{access = "read", path = "./"}]
 libs = ["lib"]
-solc = "0.8.19"
 optimizer = true
 optimizer_runs = 200
+out = "out"
+solc = "0.8.19"
+src = "src"
 via_ir = true
-evm_version = "paris"
-fs_permissions = [{ access = "read", path = "./" }]
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
 [fmt]
-bracket_spacing=true
+bracket_spacing = true
 line_length = 120

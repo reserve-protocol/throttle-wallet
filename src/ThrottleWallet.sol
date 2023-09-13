@@ -204,7 +204,7 @@ contract ThrottleWallet {
 
         WithdrawalRequest storage withdrawal = withdrawalRequests[_nonce];
 
-        require(withdrawal.amount != 0, "withdrawal does not exist");
+        assert(withdrawal.amount != 0);
         require(withdrawal.unlockTime <= block.timestamp, "withdrawal is still locked");
         require(withdrawal.status == WithdrawalStatus.Pending, "withdrawal is not pending");
 

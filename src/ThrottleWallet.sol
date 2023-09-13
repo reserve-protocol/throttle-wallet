@@ -90,7 +90,7 @@ contract ThrottleWallet {
     /**
      * @notice Nonce to withdrawal request mapping
      */
-    mapping(uint256 nonce => WithdrawalRequest request) public pendingWithdrawals;
+    mapping(uint256 nonce => WithdrawalRequest request) public withdrawalRequests;
 
     /**
      * @notice Last withdrawal timestamp {s}
@@ -180,7 +180,7 @@ contract ThrottleWallet {
         lastRemainingLimit = accumulatedWithdrawalAmount - amount;
 
         uint256 _nonce = nextNonce++;
-        pendingWithdrawals[_nonce] = WithdrawalRequest({
+        withdrawalRequests[_nonce] = WithdrawalRequest({
             amount: amount,
             target: target,
             unlockTime: block.timestamp + timelockDuration,
@@ -202,7 +202,7 @@ contract ThrottleWallet {
     function completeWithdrawal(uint256 _nonce) external {
         require(_nonce < nextNonce, "invalid nonce");
 
-        WithdrawalRequest storage withdrawal = pendingWithdrawals[_nonce];
+        WithdrawalRequest storage withdrawal = withdrawalRequests[_nonce];
 
         require(withdrawal.amount != 0, "withdrawal does not exist");
         require(withdrawal.unlockTime <= block.timestamp, "withdrawal is still locked");
@@ -225,7 +225,7 @@ contract ThrottleWallet {
     function cancelWithdrawal(uint256 _nonce) external onlyAdmin {
         require(_nonce < nextNonce, "invalid nonce");
 
-        WithdrawalRequest storage withdrawal = pendingWithdrawals[_nonce];
+        WithdrawalRequest storage withdrawal = withdrawalRequests[_nonce];
 
         require(withdrawal.status == WithdrawalStatus.Pending, "withdrawal is not pending");
 

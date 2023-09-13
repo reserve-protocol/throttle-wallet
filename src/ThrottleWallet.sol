@@ -178,7 +178,7 @@ contract ThrottleWallet {
 
         uint256 accumulatedWithdrawalAmount = availableToWithdraw();
 
-        require(amount <= accumulatedWithdrawalAmount, "amount must be less than max");
+        require(amount <= accumulatedWithdrawalAmount, "amount must be <= max");
 
         lastWithdrawalAt = block.timestamp;
         lastRemainingLimit = accumulatedWithdrawalAmount - amount;

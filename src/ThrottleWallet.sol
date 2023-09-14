@@ -102,7 +102,7 @@ contract ThrottleWallet {
     uint256 public lastWithdrawalAt;
 
     /**
-     * @notice Last remaining limit {s}
+     * @notice Last remaining limit {qRSR}
      */
     uint256 public lastRemainingLimit;
 

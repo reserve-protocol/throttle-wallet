@@ -261,6 +261,8 @@ contract ThrottleWalletTest is Test {
         throttleWallet.completeWithdrawal(1);
 
         assertEq(throttleWallet.availableToWithdraw(), 500_000_000 ether);
+
+        vm.stopPrank();
     }
 
     function test_rescueFunds() public {
@@ -284,6 +286,28 @@ contract ThrottleWalletTest is Test {
 
         assertEq(user_user.balance, 10 ether);
         assertEq(address(throttleWallet).balance, 0);
+        vm.stopPrank();
+    }
+
+    function test_badNonce() public {
+        vm.startPrank(user_user);
+
+        // Drain the entire throttle!
+        throttleWallet.initiateWithdrawal(1_000_000_000 ether, user_target);
+
+        vm.stopPrank();
+
+        vm.startPrank(user_admin);
+        vm.expectRevert("invalid nonce");
+        throttleWallet.cancelWithdrawal(1);
+
+        vm.stopPrank();
+
+        vm.startPrank(user_user);
+        vm.warp(START_TIME + 4 weeks);
+        vm.expectRevert("invalid nonce");
+        throttleWallet.completeWithdrawal(1);
+
         vm.stopPrank();
     }
 }

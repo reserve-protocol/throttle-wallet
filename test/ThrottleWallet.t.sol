@@ -44,14 +44,41 @@ contract ThrottleWalletTest is Test {
 
     function test_Withdraw() public {
         vm.startPrank(user_user);
-        vm.expectEmit();
 
+        vm.expectRevert("amount must be greater than 0");
+        throttleWallet.initiateWithdrawal(0, user_target);
+
+        vm.expectRevert("target cannot be 0x0");
+        throttleWallet.initiateWithdrawal(1_000 ether, address(0));
+
+        vm.expectRevert("insufficient funds");
+        throttleWallet.initiateWithdrawal(3_000_000_000 ether, user_target);
+
+        vm.expectEmit();
         emit WithdrawalInitiated(0, user_target, 1_000 ether, block.timestamp + 4 weeks);
         throttleWallet.initiateWithdrawal(1_000 ether, user_target);
 
         assertEq(token.balanceOf(address(throttleWallet)), 2_000_000_000 ether);
         assertEq(token.balanceOf(address(this)), 0);
         assertEq(throttleWallet.totalPending(), 1_000 ether);
+        vm.stopPrank();
+    }
+
+    function test_completeWithdraw() public {
+        vm.startPrank(user_user);
+
+        throttleWallet.initiateWithdrawal(1_000 ether, user_target);
+
+        vm.warp(START_TIME + 4 weeks);
+        throttleWallet.completeWithdrawal(0);
+
+        vm.stopPrank();
+
+        vm.startPrank(user_admin);
+        
+        vm.expectRevert("withdrawal is not pending");
+        throttleWallet.cancelWithdrawal(0);
+
         vm.stopPrank();
     }
 
@@ -183,7 +210,7 @@ contract ThrottleWalletTest is Test {
         throttleWallet.completeWithdrawal(1);
 
         // The throttle is now full charged
-        assertEq(throttleWallet.availableToWithdraw(), 1_000_000_000 ether);
+        assertEq(throttleWallet.availableToWithdraw(), 500_000_000 ether);
         vm.stopPrank();
     }
 
@@ -219,5 +246,68 @@ contract ThrottleWalletTest is Test {
         throttleWallet.renounceAdmin();
         vm.expectRevert();
         throttleWallet.changeUser(address(6));
+    }
+
+    function test_availableToWithdrawBalance() public {
+        vm.startPrank(user_user);
+
+        // Drain the entire throttle!
+        throttleWallet.initiateWithdrawal(1_000_000_000 ether, user_target);
+        vm.warp(START_TIME + 4 weeks);
+        throttleWallet.completeWithdrawal(0);
+
+        throttleWallet.initiateWithdrawal(500_000_000 ether, user_target);
+        vm.warp(START_TIME + 8 weeks);
+        throttleWallet.completeWithdrawal(1);
+
+        assertEq(throttleWallet.availableToWithdraw(), 500_000_000 ether);
+
+        vm.stopPrank();
+    }
+
+    function test_rescueFunds() public {
+        MintableERC20 lostToken = new MintableERC20("LOST", "LOST");
+        lostToken.mint(address(throttleWallet), 1_000_000_000 ether);
+
+        vm.expectRevert("cannot rescue throttled token");
+        throttleWallet.rescueFunds(address(token));
+
+        throttleWallet.rescueFunds(address(lostToken));
+
+        assertEq(lostToken.balanceOf(address(user_admin)), 1_000_000_000 ether);
+        assertEq(lostToken.balanceOf(address(throttleWallet)), 0);
+
+        vm.startPrank(user_admin);
+        throttleWallet.renounceAdmin();
+
+        deal(address(throttleWallet), 10 ether);
+
+        throttleWallet.rescueFunds(address(0));
+
+        assertEq(user_user.balance, 10 ether);
+        assertEq(address(throttleWallet).balance, 0);
+        vm.stopPrank();
+    }
+
+    function test_badNonce() public {
+        vm.startPrank(user_user);
+
+        // Drain the entire throttle!
+        throttleWallet.initiateWithdrawal(1_000_000_000 ether, user_target);
+
+        vm.stopPrank();
+
+        vm.startPrank(user_admin);
+        vm.expectRevert("invalid nonce");
+        throttleWallet.cancelWithdrawal(1);
+
+        vm.stopPrank();
+
+        vm.startPrank(user_user);
+        vm.warp(START_TIME + 4 weeks);
+        vm.expectRevert("invalid nonce");
+        throttleWallet.completeWithdrawal(1);
+
+        vm.stopPrank();
     }
 }

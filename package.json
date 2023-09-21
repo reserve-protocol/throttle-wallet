@@ -2,7 +2,8 @@
   "name": "throttle-wallet",
   "packageManager": "yarn@3.5.0",
   "dependencies": {
-    "prettier": "^2.8.8"
+    "prettier": "^3.0.3",
+    "prettier-plugin-solidity": "^1.1.3"
   },
   "scripts": {
     "test": "forge test",

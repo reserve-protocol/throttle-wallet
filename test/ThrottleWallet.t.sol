@@ -172,12 +172,15 @@ contract ThrottleWalletTest is Test {
     }
 
     function test_LinearAccumulator() public {
+        // start w/ 4B tokens
+        token.mint(address(throttleWallet), 2_000_000_000 ether);
+
         vm.startPrank(user_user);
 
         // Drain the entire throttle!
         throttleWallet.initiateWithdrawal(1_000_000_000 ether, user_target);
 
-        assertEq(token.balanceOf(address(throttleWallet)), 2_000_000_000 ether);
+        assertEq(token.balanceOf(address(throttleWallet)), 4_000_000_000 ether);
         assertEq(token.balanceOf(address(this)), 0);
         assertEq(throttleWallet.totalPending(), 1_000_000_000 ether);
 
@@ -189,7 +192,7 @@ contract ThrottleWalletTest is Test {
         vm.warp(START_TIME + 2 weeks);
         throttleWallet.initiateWithdrawal(500_000_000 ether, user_target);
 
-        assertEq(token.balanceOf(address(throttleWallet)), 2_000_000_000 ether);
+        assertEq(token.balanceOf(address(throttleWallet)), 4_000_000_000 ether);
         assertEq(token.balanceOf(address(this)), 0);
         assertEq(throttleWallet.totalPending(), 1_500_000_000 ether);
 
@@ -210,7 +213,7 @@ contract ThrottleWalletTest is Test {
         throttleWallet.completeWithdrawal(1);
 
         // The throttle is now full charged
-        assertEq(throttleWallet.availableToWithdraw(), 500_000_000 ether);
+        assertEq(throttleWallet.availableToWithdraw(), 1_000_000_000 ether);
         vm.stopPrank();
     }
 
@@ -257,6 +260,12 @@ contract ThrottleWalletTest is Test {
         throttleWallet.completeWithdrawal(0);
 
         throttleWallet.initiateWithdrawal(500_000_000 ether, user_target);
+
+        // total pending is accounted for
+        assertEq(throttleWallet.availableToWithdraw(), 500_000_000 ether);
+        vm.warp(START_TIME + 5 weeks);
+        assertEq(throttleWallet.availableToWithdraw(), 500_000_000 ether);
+
         vm.warp(START_TIME + 8 weeks);
         throttleWallet.completeWithdrawal(1);
 

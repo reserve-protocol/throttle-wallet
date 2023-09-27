@@ -155,7 +155,7 @@ contract ThrottleWallet {
             accumulatedWithdrawalAmount = amountPerPeriod;
         }
 
-        uint256 availableBalance = throttledToken.balanceOf(address(this));
+        uint256 availableBalance = throttledToken.balanceOf(address(this)) - totalPending;
         if (accumulatedWithdrawalAmount > availableBalance) {
             accumulatedWithdrawalAmount = availableBalance;
         }

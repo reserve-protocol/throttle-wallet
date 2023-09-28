@@ -14,6 +14,12 @@ https://docs.certora.com/en/latest/docs/user-guide/getting-started/install.html
 
 The `CERTORAKEY` environment variable must be set to a valid Certora key. The "pay-as-you-go" trial is currently completely free.
 
+Set the $SOLC_PATH env var to whatever solc works locally for you.  A 0.8.21 binary is provided in the /certora directory, but using [solc-select](https://github.com/crytic/solc-select) to works as well.
+```
+solc-select install 0.8.21
+solc-select use 0.8.21
+which solc
+```
 The Makefile added to the root of the repository can be used to run either all rules (`make certora`) or a specific rule (`make certora rule=my_rule`).
 
 ## Caveats

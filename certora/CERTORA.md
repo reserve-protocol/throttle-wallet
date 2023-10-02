@@ -14,10 +14,15 @@ https://docs.certora.com/en/latest/docs/user-guide/getting-started/install.html
 
 The `CERTORAKEY` environment variable must be set to a valid Certora key. The "pay-as-you-go" trial is currently completely free.
 
+Set the $SOLC_PATH env var to your local solc installation.  Use [solc-select](https://github.com/crytic/solc-select) install and use solc 0.8.19.
+```
+solc-select install 0.8.19
+solc-select use 0.8.19
+which solc
+```
 The Makefile added to the root of the repository can be used to run either all rules (`make certora`) or a specific rule (`make certora rule=my_rule`).
 
 ## Caveats
 
 * To ensure production bytecode is checked, the `solc` configuration in the Makefile must _exactly_ match that in foundry.toml (or whatever the source of truth is).
-* For simplicity a copy of the `solc` version 0.8.21 binary was included in this directory, however, ideally the same binary is used for proving as is used for testing and deployment.
 * Some rules depend on the storage layout slightly--if this changes, they will need to be updated to keep working. 

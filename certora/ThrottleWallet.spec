@@ -6,7 +6,7 @@ methods {
     function amountPerPeriod() external returns (uint256) envfree;
     function timelockDuration() external returns (uint256) envfree;
     function nextNonce() external returns (uint256) envfree;
-    function pendingWithdrawals(uint256) external returns (uint256, address, uint256, ThrottleWallet.WithdrawalStatus) envfree;
+    function withdrawalRequests(uint256) external returns (uint256, address, uint256, ThrottleWallet.WithdrawalStatus) envfree;
     function lastWithdrawalAt() external returns (uint256) envfree;
     function lastRemainingLimit() external returns (uint256) envfree;
     function totalPending() external returns (uint256) envfree;
@@ -27,11 +27,11 @@ ghost mapping(uint256 => uint256) amountGhost {
     init_state axiom forall uint256 nonce. amountGhost[nonce] == 0;
 }
 
-hook Sload uint256 v currentContract.pendingWithdrawals[KEY uint256 nonce].amount STORAGE {
+hook Sload uint256 v currentContract.withdrawalRequests[KEY uint256 nonce].amount STORAGE {
     require amountGhost[nonce] == v;
 }
 
-hook Sstore currentContract.pendingWithdrawals[KEY uint256 nonce].amount uint256 newAmount (uint256 oldAmount) STORAGE {
+hook Sstore currentContract.withdrawalRequests[KEY uint256 nonce].amount uint256 newAmount (uint256 oldAmount) STORAGE {
     // We know each amount is only written once since nextNonce is increased when an amount is written, so we do not need to subtract oldAmount.
     havoc sumOfPendingAmountsGhost assuming sumOfPendingAmountsGhost@new() == sumOfPendingAmountsGhost@old() + newAmount;
     amountGhost[nonce] = newAmount;
@@ -42,11 +42,11 @@ ghost mapping(uint256 => ThrottleWallet.WithdrawalStatus) statusGhost {
     init_state axiom forall uint256 nonce. statusGhost[nonce] == ThrottleWallet.WithdrawalStatus.Pending;
 }
 
-hook Sload ThrottleWallet.WithdrawalStatus v currentContract.pendingWithdrawals[KEY uint256 nonce].status STORAGE {
+hook Sload ThrottleWallet.WithdrawalStatus v currentContract.withdrawalRequests[KEY uint256 nonce].status STORAGE {
     require statusGhost[nonce] == v;
 }
 
-hook Sstore currentContract.pendingWithdrawals[KEY uint256 nonce].status ThrottleWallet.WithdrawalStatus newStatus (ThrottleWallet.WithdrawalStatus oldStatus) STORAGE {
+hook Sstore currentContract.withdrawalRequests[KEY uint256 nonce].status ThrottleWallet.WithdrawalStatus newStatus (ThrottleWallet.WithdrawalStatus oldStatus) STORAGE {
     havoc sumOfPendingAmountsGhost assuming 
         (
             (
@@ -78,7 +78,9 @@ rule availableToWithdraw() {
 
     mathint timeDelta = e.block.timestamp - lastWithdrawalAt();
     mathint unlimitedAccumulatedAmount = timeDelta * amountPerPeriod() / throttlePeriod() + lastRemainingLimit();
-    mathint expectedAccumulatedWithdrawalAmount = unlimitedAccumulatedAmount > to_mathint(amountPerPeriod()) ? amountPerPeriod() : unlimitedAccumulatedAmount;
+    mathint intermediateAccumulatedWithdrawalAmount = unlimitedAccumulatedAmount > to_mathint(amountPerPeriod()) ? amountPerPeriod() : unlimitedAccumulatedAmount;
+    mathint availableBalance = token.balanceOf(currentContract) - totalPending();
+    mathint expectedAccumulatedWithdrawalAmount = intermediateAccumulatedWithdrawalAmount > availableBalance ? availableBalance : intermediateAccumulatedWithdrawalAmount;
 
     mathint accumulatedWithdrawalAmount = availableToWithdraw(e);
 
@@ -91,6 +93,8 @@ rule availableToWithdraw_revert() {
     mathint timeSinceLastWithdrawal = e.block.timestamp - lastWithdrawalAt();
     mathint product = timeSinceLastWithdrawal * amountPerPeriod();
     mathint unlimitedAccumulatedAmount = product / throttlePeriod() + lastRemainingLimit();
+    mathint totalPendingAmount = totalPending();
+    mathint tokenBalance = token.balanceOf(currentContract);
 
     availableToWithdraw@withrevert(e);
 
@@ -98,11 +102,13 @@ rule availableToWithdraw_revert() {
     bool revert2 = timeSinceLastWithdrawal < 0;
     bool revert3 = product > max_uint256;
     bool revert4 = unlimitedAccumulatedAmount > max_uint256;
+    bool revert5 = totalPendingAmount > tokenBalance;
     assert revert1 => lastReverted, "revert1 falied";
     assert revert2 => lastReverted, "revert2 failed";
     assert revert3 => lastReverted, "revert3 failed";
     assert revert4 => lastReverted, "revert4 falied";
-    assert lastReverted => revert1 || revert2 || revert3 || revert4, "not all reversion cases are covered";
+    assert revert5 => lastReverted, "revert5 failed";
+    assert lastReverted => revert1 || revert2 || revert3 || revert4 || revert5, "not all reversion cases are covered";
 }
 
 rule initiateWithdrawal(uint256 amount, address target) {
@@ -120,7 +126,7 @@ rule initiateWithdrawal(uint256 amount, address target) {
     address targetOtherNonceBefore;
     uint256 unlockTimeOtherNonceBefore;
     ThrottleWallet.WithdrawalStatus statusOtherNonceBefore;
-    amountOtherNonceBefore, targetOtherNonceBefore, unlockTimeOtherNonceBefore, statusOtherNonceBefore = pendingWithdrawals(otherNonce);
+    amountOtherNonceBefore, targetOtherNonceBefore, unlockTimeOtherNonceBefore, statusOtherNonceBefore = withdrawalRequests(otherNonce);
 
     initiateWithdrawal(e, amount, target);
 
@@ -135,7 +141,7 @@ rule initiateWithdrawal(uint256 amount, address target) {
     address targetNonceAfter;
     uint256 unlockTimeNonceAfter;
     ThrottleWallet.WithdrawalStatus statusNonceAfter;
-    amountNonceAfter, targetNonceAfter, unlockTimeNonceAfter, statusNonceAfter = pendingWithdrawals(assert_uint256(nextNonceBefore));
+    amountNonceAfter, targetNonceAfter, unlockTimeNonceAfter, statusNonceAfter = withdrawalRequests(assert_uint256(nextNonceBefore));
     assert amountNonceAfter == amount, "initiateWithdrawal did not set the withdrawal amount correctly";
     assert targetNonceAfter == target, "initiateWithdrawal did not set the withdrawal target correctly";
     assert unlockTimeNonceAfter == assert_uint256(e.block.timestamp + timelockDuration()), "initiateWithdrawal did not set the withdrawal unlock time correctly";
@@ -148,7 +154,7 @@ rule initiateWithdrawal(uint256 amount, address target) {
     address targetOtherNonceAfter;
     uint256 unlockTimeOtherNonceAfter;
     ThrottleWallet.WithdrawalStatus statusOtherNonceAfter;
-    amountOtherNonceAfter, targetOtherNonceAfter, unlockTimeOtherNonceAfter, statusOtherNonceAfter = pendingWithdrawals(otherNonce);
+    amountOtherNonceAfter, targetOtherNonceAfter, unlockTimeOtherNonceAfter, statusOtherNonceAfter = withdrawalRequests(otherNonce);
     assert amountOtherNonceBefore == amountOtherNonceAfter, "initiateWithdrawal changed the amount of another nonce unexpectedly";
     assert targetOtherNonceBefore == targetOtherNonceAfter, "initiateWithdrawal changed the target of another nonce unexpectedly";
     assert unlockTimeOtherNonceBefore == unlockTimeOtherNonceAfter, "initiateWithdrawal changed the unlockTime of another nonce unexpectedly";
@@ -184,6 +190,7 @@ rule initiateWithdrawal_revert(uint256 amount, address target) {
     bool revert9  = accumulatedWithdrawalAmount < to_mathint(amount);
     bool revert10 = nonce == max_uint256;
     bool revert11 = e.block.timestamp + timelockDuration_ > max_uint256;
+    bool revert12 = target == 0x0000000000000000000000000000000000000000;
     assert revert1  => lastReverted, "revert1  failed";
     assert revert2  => lastReverted, "revert2  failed";
     assert revert3  => lastReverted, "revert3  failed";
@@ -195,9 +202,10 @@ rule initiateWithdrawal_revert(uint256 amount, address target) {
     assert revert9  => lastReverted, "revert9  failed";
     assert revert10 => lastReverted, "revert10 failed";
     assert revert11 => lastReverted, "revert11 failed";
+    assert revert12 => lastReverted, "revert12 failed";
     assert lastReverted => revert1 || revert2  || revert3   || revert4 ||
                            revert5 || revert6  || revert7   || revert8 ||
-                           revert9 || revert10 || revert11, "not all reversion cases are covered";
+                           revert9 || revert10 || revert11  || revert12, "not all reversion cases are covered";
 }
 
 // Technically covered by initiateWithdrawal_revert, but this is a good property to make explicit.
@@ -221,14 +229,14 @@ rule completeWithdrawal(uint256 nonce) {
     address targetNonceBefore;
     uint256 unlockTimeNonceBefore;
     ThrottleWallet.WithdrawalStatus statusNonceBefore;  // unused
-    amountNonceBefore, targetNonceBefore, unlockTimeNonceBefore, statusNonceBefore = pendingWithdrawals(nonce);
+    amountNonceBefore, targetNonceBefore, unlockTimeNonceBefore, statusNonceBefore = withdrawalRequests(nonce);
     uint256 otherNonce;
     require otherNonce != nonce;
     uint256 amountOtherNonceBefore;
     address targetOtherNonceBefore;
     uint256 unlockTimeOtherNonceBefore;
     ThrottleWallet.WithdrawalStatus statusOtherNonceBefore;
-    amountOtherNonceBefore, targetOtherNonceBefore, unlockTimeOtherNonceBefore, statusOtherNonceBefore = pendingWithdrawals(otherNonce);
+    amountOtherNonceBefore, targetOtherNonceBefore, unlockTimeOtherNonceBefore, statusOtherNonceBefore = withdrawalRequests(otherNonce);
 
     env e;
     completeWithdrawal(e, nonce);
@@ -237,7 +245,7 @@ rule completeWithdrawal(uint256 nonce) {
     address targetNonceAfter;
     uint256 unlockTimeNonceAfter;
     ThrottleWallet.WithdrawalStatus statusNonceAfter;
-    amountNonceAfter, targetNonceAfter, unlockTimeNonceAfter, statusNonceAfter = pendingWithdrawals(nonce);
+    amountNonceAfter, targetNonceAfter, unlockTimeNonceAfter, statusNonceAfter = withdrawalRequests(nonce);
 
     // checks for modified values
     assert to_mathint(totalPending()) == totalPendingBefore - amountNonceBefore, "completeWithdrawal did not update totalPending as expected";
@@ -258,7 +266,7 @@ rule completeWithdrawal(uint256 nonce) {
     address targetOtherNonceAfter;
     uint256 unlockTimeOtherNonceAfter;
     ThrottleWallet.WithdrawalStatus statusOtherNonceAfter;
-    amountOtherNonceAfter, targetOtherNonceAfter, unlockTimeOtherNonceAfter, statusOtherNonceAfter = pendingWithdrawals(otherNonce);
+    amountOtherNonceAfter, targetOtherNonceAfter, unlockTimeOtherNonceAfter, statusOtherNonceAfter = withdrawalRequests(otherNonce);
     assert amountOtherNonceBefore == amountOtherNonceAfter, "completeWithdrawal changed the amount of another nonce unexpectedly";
     assert targetOtherNonceBefore == targetOtherNonceAfter, "completeWithdrawal changed the target of another nonce unexpectedly";
     assert unlockTimeOtherNonceBefore == unlockTimeOtherNonceAfter, "completeWithdrawal changed the unlockTime of another nonce unexpectedly";
@@ -274,7 +282,7 @@ rule completeWithdrawal_revert(uint256 nonce) {
     address target;
     uint256 unlockTime;
     ThrottleWallet.WithdrawalStatus status;
-    amount, target, unlockTime, status = pendingWithdrawals(nonce);
+    amount, target, unlockTime, status = withdrawalRequests(nonce);
 
     env e;
     completeWithdrawal@withrevert(e, nonce);
@@ -308,14 +316,14 @@ rule cancelWithdrawal(uint256 nonce) {
     address targetNonceBefore;
     uint256 unlockTimeNonceBefore;
     ThrottleWallet.WithdrawalStatus statusNonceBefore;  // unused
-    amountNonceBefore, targetNonceBefore, unlockTimeNonceBefore, statusNonceBefore = pendingWithdrawals(nonce);
+    amountNonceBefore, targetNonceBefore, unlockTimeNonceBefore, statusNonceBefore = withdrawalRequests(nonce);
     uint256 otherNonce;
     require otherNonce != nonce;
     uint256 amountOtherNonceBefore;
     address targetOtherNonceBefore;
     uint256 unlockTimeOtherNonceBefore;
     ThrottleWallet.WithdrawalStatus statusOtherNonceBefore;
-    amountOtherNonceBefore, targetOtherNonceBefore, unlockTimeOtherNonceBefore, statusOtherNonceBefore = pendingWithdrawals(otherNonce);
+    amountOtherNonceBefore, targetOtherNonceBefore, unlockTimeOtherNonceBefore, statusOtherNonceBefore = withdrawalRequests(otherNonce);
 
     env e;
     cancelWithdrawal(e, nonce);
@@ -324,7 +332,7 @@ rule cancelWithdrawal(uint256 nonce) {
     address targetNonceAfter;
     uint256 unlockTimeNonceAfter;
     ThrottleWallet.WithdrawalStatus statusNonceAfter;
-    amountNonceAfter, targetNonceAfter, unlockTimeNonceAfter, statusNonceAfter = pendingWithdrawals(nonce);
+    amountNonceAfter, targetNonceAfter, unlockTimeNonceAfter, statusNonceAfter = withdrawalRequests(nonce);
 
     // checks for modified values
     assert to_mathint(totalPending()) == totalPendingBefore - amountNonceBefore, "cancelWithdrawal did not update totalPending as expected";
@@ -343,7 +351,7 @@ rule cancelWithdrawal(uint256 nonce) {
     address targetOtherNonceAfter;
     uint256 unlockTimeOtherNonceAfter;
     ThrottleWallet.WithdrawalStatus statusOtherNonceAfter;
-    amountOtherNonceAfter, targetOtherNonceAfter, unlockTimeOtherNonceAfter, statusOtherNonceAfter = pendingWithdrawals(otherNonce);
+    amountOtherNonceAfter, targetOtherNonceAfter, unlockTimeOtherNonceAfter, statusOtherNonceAfter = withdrawalRequests(otherNonce);
     assert amountOtherNonceBefore == amountOtherNonceAfter, "cancelWithdrawal changed the amount of another nonce unexpectedly";
     assert targetOtherNonceBefore == targetOtherNonceAfter, "cancelWithdrawal changed the target of another nonce unexpectedly";
     assert unlockTimeOtherNonceBefore == unlockTimeOtherNonceAfter, "cancelWithdrawal changed the unlockTime of another nonce unexpectedly";
@@ -358,7 +366,7 @@ rule cancelWithdrawal_revert(uint256 nonce) {
     address target;
     uint256 unlockTime;
     ThrottleWallet.WithdrawalStatus status;
-    amount, target, unlockTime, status = pendingWithdrawals(nonce);
+    amount, target, unlockTime, status = withdrawalRequests(nonce);
 
     env e;
     cancelWithdrawal@withrevert(e, nonce);
@@ -387,7 +395,7 @@ rule changeUser(address newUser) {
     address targetBefore;
     uint256 unlockTimeBefore;
     ThrottleWallet.WithdrawalStatus statusBefore;
-    amountBefore, targetBefore, unlockTimeBefore, statusBefore = pendingWithdrawals(anyUint256);
+    amountBefore, targetBefore, unlockTimeBefore, statusBefore = withdrawalRequests(anyUint256);
     uint256 lastWithdrawalAtBefore = lastWithdrawalAt();
     uint256 lastRemainingLimitBefore = lastRemainingLimit();
     uint256 totalPendingBefore = totalPending();
@@ -401,7 +409,7 @@ rule changeUser(address newUser) {
     address targetAfter;
     uint256 unlockTimeAfter;
     ThrottleWallet.WithdrawalStatus statusAfter;
-    amountAfter, targetAfter, unlockTimeAfter, statusAfter = pendingWithdrawals(anyUint256);
+    amountAfter, targetAfter, unlockTimeAfter, statusAfter = withdrawalRequests(anyUint256);
     assert amountBefore == amountAfter, "changeUser changed some withdrawal amount unexpectedly";
     assert targetBefore == targetAfter, "changeUser changed some withdrawal target unexpectedly";
     assert unlockTimeBefore == unlockTimeAfter, "changeUser changed some withdrawal unlockTime unexpectedly";
@@ -438,7 +446,7 @@ rule renounceAdmin() {
     address targetBefore;
     uint256 unlockTimeBefore;
     ThrottleWallet.WithdrawalStatus statusBefore;
-    amountBefore, targetBefore, unlockTimeBefore, statusBefore = pendingWithdrawals(anyUint256);
+    amountBefore, targetBefore, unlockTimeBefore, statusBefore = withdrawalRequests(anyUint256);
     uint256 lastWithdrawalAtBefore = lastWithdrawalAt();
     uint256 lastRemainingLimitBefore = lastRemainingLimit();
     uint256 totalPendingBefore = totalPending();
@@ -452,7 +460,7 @@ rule renounceAdmin() {
     address targetAfter;
     uint256 unlockTimeAfter;
     ThrottleWallet.WithdrawalStatus statusAfter;
-    amountAfter, targetAfter, unlockTimeAfter, statusAfter = pendingWithdrawals(anyUint256);
+    amountAfter, targetAfter, unlockTimeAfter, statusAfter = withdrawalRequests(anyUint256);
     assert amountBefore == amountAfter, "renounceAdmin changed some withdrawal amount unexpectedly";
     assert targetBefore == targetAfter, "renounceAdmin changed some withdrawal target unexpectedly";
     assert unlockTimeBefore == unlockTimeAfter, "renounceAdmin changed some withdrawal unlockTime unexpectedly";

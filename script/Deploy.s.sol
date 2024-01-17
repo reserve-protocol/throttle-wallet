@@ -7,8 +7,8 @@ import "forge-std/console2.sol";
 import { ThrottleWallet } from "../src/ThrottleWallet.sol";
 import { ERC20 } from "@openzeppelin/token/ERC20/ERC20.sol";
 
-address constant ADDRESS_ADMIN = address(1);
-address constant ADDRESS_USER = address(2);
+address constant ADDRESS_ADMIN = 0x27e6DC36e7F05d64B6ab284338243982b0e26d78;
+address constant ADDRESS_USER = 0x7cc1bfAB73bE4E02BB53814d1059A98cF7e49644;
 
 contract DeployScript is Script {
     function setUp() public {}

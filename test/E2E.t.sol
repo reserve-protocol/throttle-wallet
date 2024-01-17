@@ -16,16 +16,17 @@ contract E2ETest is Test {
     ThrottleWallet private throttleWallet;
     address old_owner;
 
-    address user_admin = address(0x1);
-    address user_user1 = address(0x2);
+    address user_admin = address(0x27e6DC36e7F05d64B6ab284338243982b0e26d78);
+    address user_user1 = address(0x7cc1bfAB73bE4E02BB53814d1059A98cF7e49644);
     address user_user2 = address(0x3);
 
     address withdrawTarget = address(0xC0FFEE);
+    address tw = 0x510A90e2195c64d703E5E0959086cd1b7F9109ca;
 
     function setUp() public {
         vm.createSelectFork("https://rpc.ankr.com/eth");
 
-        throttleWallet = new ThrottleWallet(user_admin, user_user1);
+        throttleWallet = ThrottleWallet(tw);
         old_owner = slowWallet.owner();
     }
 

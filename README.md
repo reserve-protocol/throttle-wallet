@@ -1,5 +1,9 @@
-# Reserve Throttle Wallet
+# Reserve Throttle Wallet (SlowerWallet)
 This contract is meant to hold funds and allow USER to withdraw them at a pre-specified maximum rate (1b / month).
+
+## Deployment
+
+https://etherscan.io/address/0x6bab6EB87Aa5a1e4A8310C73bDAAA8A5dAAd81C1
 
 ## Spec
 ### Settings

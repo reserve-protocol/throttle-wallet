@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import "forge-std/Script.sol";
 import "forge-std/console2.sol";
 
-import { ThrottleWallet } from "../src/ThrottleWallet.sol";
+import { SlowerWallet } from "../src/SlowerWallet.sol";
 import { ERC20 } from "@openzeppelin/token/ERC20/ERC20.sol";
 
 address constant ADDRESS_ADMIN = 0x27e6DC36e7F05d64B6ab284338243982b0e26d78;
@@ -19,10 +19,10 @@ contract DeployScript is Script {
 
         vm.startBroadcast(privateKey);
 
-        ThrottleWallet throttleWallet = new ThrottleWallet(ADDRESS_ADMIN, ADDRESS_USER);
+        SlowerWallet slowerWallet = new SlowerWallet(ADDRESS_ADMIN, ADDRESS_USER);
 
-        console2.log(throttleWallet.lastWithdrawalAt());
-        console2.log(throttleWallet.nextNonce());
+        console2.log(slowerWallet.lastWithdrawalAt());
+        console2.log(slowerWallet.nextNonce());
 
         vm.stopBroadcast();
     }

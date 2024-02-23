@@ -1,11 +1,13 @@
 # Reserve Throttle Wallet (SlowerWallet)
+
 This contract is meant to hold funds and allow USER to withdraw them at a pre-specified maximum rate (1b / month).
 
 ## Deployment
 
-https://etherscan.io/address/0x6bab6EB87Aa5a1e4A8310C73bDAAA8A5dAAd81C1
+- [Throttle Wallet (Slower Wallet)](https://etherscan.io/address/0x0774dF07205a5E9261771b19afa62B6e757f7eF8)
 
 ## Spec
+
 ### Settings
 
 - Throttle period: 4 weeks
@@ -31,10 +33,10 @@ https://etherscan.io/address/0x6bab6EB87Aa5a1e4A8310C73bDAAA8A5dAAd81C1
 
 - Anyone can view the amount of funds that are available to withdraw within the current throttle bounds.
 - Anyone can view:
-    - the status and amount of any initiated withdrawals
-    - the last time a withdrawal was initiated
-    - the last remaining throttle amount
-    - the total amount of funds that are pending the completion of a withdrawal
-    - the next withdrawal nonce
-    - the address of the current Admin
-    - the address of the current User
+  - the status and amount of any initiated withdrawals
+  - the last time a withdrawal was initiated
+  - the last remaining throttle amount
+  - the total amount of funds that are pending the completion of a withdrawal
+  - the next withdrawal nonce
+  - the address of the current Admin
+  - the address of the current User

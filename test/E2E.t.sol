@@ -12,6 +12,7 @@ import { IERC20, ERC20 } from "@openzeppelin/token/ERC20/ERC20.sol";
 contract E2ETest is Test {
     IERC20 private constant RSR = IERC20(0x320623b8E4fF03373931769A31Fc52A4E78B5d70);
     ISlowWallet private constant slowWallet = ISlowWallet(0x6bab6EB87Aa5a1e4A8310C73bDAAA8A5dAAd81C1);
+    ThrottleWallet private constant throttleWallet = ThrottleWallet(0x510A90e2195c64d703E5E0959086cd1b7F9109ca); // Deployed version of the ThrottleWallet
 
     SlowerWallet private slowerWallet;
     address old_owner;
@@ -24,7 +25,7 @@ contract E2ETest is Test {
     address tw = 0x0774dF07205a5E9261771b19afa62B6e757f7eF8;
 
     function setUp() public {
-        vm.createSelectFork("https://rpc.ankr.com/eth");
+        vm.createSelectFork("https://mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161", 19144204);
 
         slowerWallet = SlowerWallet(tw);
         old_owner = slowWallet.owner();

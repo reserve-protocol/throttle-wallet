@@ -6,9 +6,37 @@
     "prettier-plugin-solidity": "^1.1.3"
   },
   "scripts": {
+    "compile": "npx hardhat compile",
+    "devchain": "FORK=true hardhat node --port 8546",
     "test": "forge test",
     "debug": "forge test -vvv",
     "trace": "forge test -vvvvv",
     "deploy": "forge script script/Deploy.s.sol:DeployScript --broadcast --verify --rpc-url https://rpc.ankr.com/eth"
+  },
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:reserve-protocol/throttle-wallet.git",
+  "author": "Patrick McKelvy <pmckelvy1@gmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.5",
+    "@nomicfoundation/hardhat-foundry": "^1.1.1",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "@typechain/ethers-v6": "^0.5.0",
+    "@typechain/hardhat": "^9.1.0",
+    "@types/chai": "^4.2.0",
+    "@types/mocha": ">=9.1.0",
+    "chai": "^4.2.0",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.11.1",
+    "hardhat": "^2.20.1",
+    "hardhat-gas-reporter": "^1.0.8",
+    "solidity-coverage": "^0.8.1",
+    "ts-node": "^10.9.2",
+    "typechain": "^8.3.0",
+    "typescript": "^5.3.3"
   }
 }

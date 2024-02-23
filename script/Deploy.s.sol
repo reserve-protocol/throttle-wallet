@@ -11,7 +11,7 @@ address constant ADDRESS_ADMIN = 0x27e6DC36e7F05d64B6ab284338243982b0e26d78;
 address constant ADDRESS_USER = 0x7cc1bfAB73bE4E02BB53814d1059A98cF7e49644;
 
 contract DeployScript is Script {
-    function setUp() public {}
+    function setUp() public { }
 
     function run() public {
         string memory seedPhrase = vm.readFile(".secret");

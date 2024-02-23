@@ -8,12 +8,12 @@ import { ISlowWallet } from "./interfaces/ISlowWallet.sol";
 import { SlowerWallet } from "../src/SlowerWallet.sol";
 import { IERC20, ERC20 } from "@openzeppelin/token/ERC20/ERC20.sol";
 
-// End-2-end Test for Wallet Migration for RSR
+// End-2-End Test for Wallet Migration for RSR
 contract E2ETest is Test {
     IERC20 private constant RSR = IERC20(0x320623b8E4fF03373931769A31Fc52A4E78B5d70);
     ISlowWallet private constant slowWallet = ISlowWallet(0x6bab6EB87Aa5a1e4A8310C73bDAAA8A5dAAd81C1);
+    SlowerWallet private constant slowerWallet = SlowerWallet(0x0774dF07205a5E9261771b19afa62B6e757f7eF8);
 
-    SlowerWallet private slowerWallet;
     address old_owner;
 
     address user_admin = address(0x27e6DC36e7F05d64B6ab284338243982b0e26d78);
@@ -21,12 +21,10 @@ contract E2ETest is Test {
     address user_user2 = address(0x3);
 
     address withdrawTarget = address(0xC0FFEE);
-    address tw = 0x0774dF07205a5E9261771b19afa62B6e757f7eF8;
 
     function setUp() public {
         vm.createSelectFork("https://mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161", 19144204);
 
-        slowerWallet = SlowerWallet(tw);
         old_owner = slowWallet.owner();
     }
 

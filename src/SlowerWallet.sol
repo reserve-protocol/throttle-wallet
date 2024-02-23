@@ -148,8 +148,8 @@ contract SlowerWallet {
      */
     function availableToWithdraw() public view returns (uint256) {
         uint256 timeSinceLastWithdrawal = block.timestamp - lastWithdrawalAt;
-        uint256 accumulatedWithdrawalAmount = ((timeSinceLastWithdrawal * amountPerPeriod) / throttlePeriod) +
-            lastRemainingLimit;
+        uint256 accumulatedWithdrawalAmount =
+            ((timeSinceLastWithdrawal * amountPerPeriod) / throttlePeriod) + lastRemainingLimit;
 
         if (accumulatedWithdrawalAmount > amountPerPeriod) {
             accumulatedWithdrawalAmount = amountPerPeriod;

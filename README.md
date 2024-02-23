@@ -4,7 +4,7 @@ This contract is meant to hold funds and allow USER to withdraw them at a pre-sp
 
 ## Deployment
 
-- [Throttle Wallet (Slower Wallet)](https://etherscan.io/address/0x0774dF07205a5E9261771b19afa62B6e757f7eF8)
+- [Throttle Wallet (SlowerWallet)](https://etherscan.io/address/0x0774dF07205a5E9261771b19afa62B6e757f7eF8)
 
 ## Spec
 

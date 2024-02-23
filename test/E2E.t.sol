@@ -12,7 +12,6 @@ import { IERC20, ERC20 } from "@openzeppelin/token/ERC20/ERC20.sol";
 contract E2ETest is Test {
     IERC20 private constant RSR = IERC20(0x320623b8E4fF03373931769A31Fc52A4E78B5d70);
     ISlowWallet private constant slowWallet = ISlowWallet(0x6bab6EB87Aa5a1e4A8310C73bDAAA8A5dAAd81C1);
-    ThrottleWallet private constant throttleWallet = ThrottleWallet(0x510A90e2195c64d703E5E0959086cd1b7F9109ca); // Deployed version of the ThrottleWallet
 
     SlowerWallet private slowerWallet;
     address old_owner;
